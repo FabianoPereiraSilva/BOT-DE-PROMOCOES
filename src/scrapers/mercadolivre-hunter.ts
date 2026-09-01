@@ -135,11 +135,13 @@ export class MercadoLivreHunter {
     const deals: Deal[] = [];
     const targetUrls: string[] = [];
 
-    // Se houver busca direta por marca/termo (ex: "Nike", "Apple", "Growth", "Stanley")
+    // Se houver busca direta por marca/termo (ex: "Fila", "Nike", "Apple", "Growth", "Stanley")
     if (searchQuery && searchQuery.trim().length > 0) {
-      const q = encodeURIComponent(searchQuery.trim());
-      targetUrls.push(`https://www.mercadolivre.com.br/ofertas?q=${q}`);
-      targetUrls.push(`https://www.mercadolivre.com.br/ofertas?promotion_type=deal_of_the_day&q=${q}`);
+      const cleanQ = searchQuery.trim().toLowerCase();
+      const slug = encodeURIComponent(cleanQ).replace(/%20/g, '-');
+      targetUrls.push(`https://lista.mercadolivre.com.br/${slug}_Desconto_${Math.min(minDiscount, 10)}-100`);
+      targetUrls.push(`https://lista.mercadolivre.com.br/${slug}`);
+      targetUrls.push(`https://www.mercadolivre.com.br/ofertas?q=${encodeURIComponent(cleanQ)}`);
     } else {
       const preset = CATEGORY_PRESETS[categoryKey];
 
@@ -151,8 +153,9 @@ export class MercadoLivreHunter {
         const keywords = customKeywords.length > 0 ? customKeywords : preset.defaultKeywords;
         
         for (const kw of keywords.slice(0, 3)) {
-          const formattedKw = encodeURIComponent(kw);
-          targetUrls.push(`https://www.mercadolivre.com.br/ofertas?q=${formattedKw}`);
+          const kwSlug = encodeURIComponent(kw.toLowerCase().trim()).replace(/%20/g, '-');
+          targetUrls.push(`https://lista.mercadolivre.com.br/${kwSlug}_Desconto_${Math.min(minDiscount, 15)}-100`);
+          targetUrls.push(`https://lista.mercadolivre.com.br/${kwSlug}`);
         }
 
         if (preset.mlCategoryId) {
@@ -237,7 +240,8 @@ export class MercadoLivreHunter {
               discountPercent = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
             }
 
-            if (discountPercent && discountPercent < minDiscount) return;
+            // Se NÃO for busca direta de marca, aplica o filtro estrito de desconto mínimo
+            if (!searchQuery && discountPercent && discountPercent < minDiscount) return;
 
             const isFreeShipping = card.find('.poly-component__shipping:contains("grátis"), .promotion-item__shipping:contains("grátis"), span:contains("Frete grátis")').length > 0;
 
