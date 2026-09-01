@@ -414,6 +414,25 @@
                 </label>
               </div>
 
+              <div class="form-group full-width">
+                <label for="setting-default-category">🎯 Nicho / Categoria Fixada da Automação:</label>
+                <select id="setting-default-category" class="custom-select">
+                  <option value="esportes_suplementos">💪 Esportes & Suplementação (Whey, Creatina, Tênis, etc.)</option>
+                  <option value="eletronicos_tech">📱 Eletrônicos & Tecnologia (Smartphones, Fones, etc.)</option>
+                  <option value="casa_cozinha">🍳 Casa & Cozinha (Air Fryer, Panelas, etc.)</option>
+                  <option value="moda_beleza">💄 Beleza, Perfumaria & Moda</option>
+                  <option value="games_informatica">🎮 Games & Informática</option>
+                  <option value="geral">🔥 Geral (Todas as Categorias)</option>
+                </select>
+                <small>Define qual nicho o Piloto Automático caçará e postará no canal principal.</small>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="setting-default-keywords">🏷️ Marcas e Palavras-chave Fixadas (Opcional):</label>
+                <input type="text" id="setting-default-keywords" placeholder="Ex: creatina, whey, growth, soldiers nutrition, max titanium, nike">
+                <small>Separe por vírgula para fixar o robô a caçar <b>apenas estas marcas/produtos</b>.</small>
+              </div>
+
               <div class="form-group">
                 <label for="setting-autopilot-interval">Intervalo entre Varreduras (minutos):</label>
                 <input type="number" id="setting-autopilot-interval" min="5" max="1440" value="20">
@@ -422,7 +441,7 @@
 
               <div class="form-group">
                 <label for="setting-min-discount">Desconto Mínimo Geral (%):</label>
-                <input type="number" id="setting-min-discount" min="5" max="95" value="25">
+                <input type="number" id="setting-min-discount" min="5" max="95" value="20">
               </div>
 
               <div class="form-group">
@@ -432,7 +451,8 @@
 
               <div class="form-group">
                 <label for="setting-dedup-hours">Anti-Duplicação por Canal (horas):</label>
-                <input type="number" id="setting-dedup-hours" min="1" max="720" value="48">
+                <input type="number" id="setting-dedup-hours" min="1" max="720" value="72">
+                <small>Tempo em horas que um produto fica bloqueado de ser postado novamente.</small>
               </div>
             </div>
           </div>

@@ -61,6 +61,8 @@ export interface SystemSettings {
   minDiscountPercent: number;
   minPrice: number;
   deduplicationHours: number;
+  defaultCategory?: string;
+  defaultKeywords?: string[];
   customCopyTemplate?: string;
 }
 

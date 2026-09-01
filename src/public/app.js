@@ -723,6 +723,9 @@ function initSettings() {
     const feedback = document.getElementById('save-feedback');
     feedback.textContent = 'Salvando...';
 
+    const rawKeywords = document.getElementById('setting-default-keywords').value.trim();
+    const defaultKeywords = rawKeywords ? rawKeywords.split(',').map(k => k.trim()).filter(Boolean) : [];
+
     const payload = {
       telegramBotToken: tokenInput.value.trim(),
       telegramChatId: document.getElementById('setting-tg-chat').value.trim(),
@@ -733,7 +736,9 @@ function initSettings() {
       autopilotIntervalMinutes: parseInt(document.getElementById('setting-autopilot-interval').value, 10),
       minDiscountPercent: parseFloat(document.getElementById('setting-min-discount').value),
       minPrice: parseFloat(document.getElementById('setting-min-price').value),
-      deduplicationHours: parseInt(document.getElementById('setting-dedup-hours').value, 10)
+      deduplicationHours: parseInt(document.getElementById('setting-dedup-hours').value, 10),
+      defaultCategory: document.getElementById('setting-default-category').value,
+      defaultKeywords
     };
 
     try {
@@ -769,9 +774,13 @@ async function fetchSettings() {
       document.getElementById('setting-shopee-secret').value = s.shopeeSecret || '';
       document.getElementById('setting-autopilot-enabled').checked = s.autopilotEnabled;
       document.getElementById('setting-autopilot-interval').value = s.autopilotIntervalMinutes || 20;
-      document.getElementById('setting-min-discount').value = s.minDiscountPercent || 25;
+      document.getElementById('setting-min-discount').value = s.minDiscountPercent || 20;
       document.getElementById('setting-min-price').value = s.minPrice || 15;
-      document.getElementById('setting-dedup-hours').value = s.deduplicationHours || 48;
+      document.getElementById('setting-dedup-hours').value = s.deduplicationHours || 72;
+      if (s.defaultCategory) document.getElementById('setting-default-category').value = s.defaultCategory;
+      if (s.defaultKeywords && Array.isArray(s.defaultKeywords)) {
+        document.getElementById('setting-default-keywords').value = s.defaultKeywords.join(', ');
+      }
     }
   } catch (err) {
     console.error('Erro ao carregar configurações:', err);

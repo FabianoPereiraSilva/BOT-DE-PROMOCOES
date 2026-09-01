@@ -190,9 +190,34 @@ export class MercadoLivreHunter {
               imageUrl = card.find('img').attr('data-src') || '';
             }
 
+            // Verificação Rigorosa de Relevância por Marca / Termo
+            if (searchQuery && searchQuery.trim().length > 0) {
+              const qLower = searchQuery.toLowerCase().trim();
+              const tLower = title.toLowerCase();
+              const queryWords = qLower.split(/\s+/).filter(w => w.length >= 3);
+              const hasMatch = tLower.includes(qLower) || (queryWords.length > 0 && queryWords.some(w => tLower.includes(w)));
+              if (!hasMatch) return; // Rejeita produtos que não têm a marca buscada no título!
+            } else if (categoryKey === 'esportes_suplementos') {
+              // Rejeita câmeras, tripés, compressores e itens que não são de esporte/suplementação
+              const sportsTerms = [
+                'creatina', 'whey', 'proteina', 'suplemento', 'pre treino', 'pre-treino', 'bcaa', 
+                'glutamina', 'tenis', 'corrida', 'fitness', 'treino', 'academia', 'halter', 'anilha', 
+                'crossfit', 'smartband', 'squeeze', 'coqueteleira', 'albumina', 'hipercalorico', 
+                'colageno', 'termogenico', 'bicicleta', 'esportivo', 'esportiva', 'ciclismo', 'kimono',
+                'joelheira', 'munhequeira', 'strap', 'faixa elastica', 'corda de pular'
+              ];
+              const tLower = title.toLowerCase();
+              const isRelevant = sportsTerms.some(term => tLower.includes(term));
+              if (!isRelevant) return; // Rejeita itens aleatórios fora do nicho!
+            } else if (categoryKey === 'eletronicos_tech') {
+              const techTerms = ['fone', 'bluetooth', 'smartwatch', 'relogio', 'celular', 'smartphone', 'carregador', 'power bank', 'caixa de som', 'teclado', 'mouse', 'cabo', 'notebook', 'tablet', 'alexa', 'headset', 'ssd', 'monitor'];
+              const isRelevant = techTerms.some(term => title.toLowerCase().includes(term));
+              if (!isRelevant) return;
+            }
+
             // Preço atual
-            const currentFraction = card.find('.poly-price__current .andes-money-amount__fraction, .promotion-item__price .andes-money-amount__fraction, .ui-search-price__second-line .andes-money-amount__fraction').first().text().trim();
-            const currentCents = card.find('.poly-price__current .andes-money-amount__cents, .promotion-item__price .andes-money-amount__cents, .ui-search-price__second-line .andes-money-amount__cents').first().text().trim() || '00';
+            const currentFraction = card.find('.poly-price__current .andes-money-amount__fraction, .promotion-item__price .andes-money-amount__fraction, .ui-search-price__second-line .andes-money-amount__fraction, .andes-money-amount__fraction').first().text().trim();
+            const currentCents = card.find('.poly-price__current .andes-money-amount__cents, .promotion-item__price .andes-money-amount__cents, .ui-search-price__second-line .andes-money-amount__cents, .andes-money-amount__cents').first().text().trim() || '00';
             const currentPrice = cleanPrice(`${currentFraction}.${currentCents}`);
 
             if (currentPrice < minPrice) return;

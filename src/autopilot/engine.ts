@@ -80,14 +80,15 @@ export class AutopilotEngine {
     const settings = getSystemSettings();
     const activeChannels = dbService.getActiveChannels();
 
-    // Se não há canais específicos cadastrados, usa o canal padrão se configurado
+    // Se não há canais específicos cadastrados, usa o canal padrão com o nicho configurado
     const channelsToProcess: ChannelConfig[] = activeChannels.length > 0 ? activeChannels : (
       settings.telegramChatId ? [{
         id: 'default',
         name: 'Canal Principal',
         platform: 'telegram',
         chatId: settings.telegramChatId,
-        category: 'geral',
+        category: settings.defaultCategory || 'esportes_suplementos',
+        keywords: settings.defaultKeywords && settings.defaultKeywords.length > 0 ? settings.defaultKeywords : undefined,
         minDiscountPercent: settings.minDiscountPercent,
         minPrice: settings.minPrice,
         isActive: true
