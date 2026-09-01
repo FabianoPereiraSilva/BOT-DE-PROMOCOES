@@ -168,7 +168,37 @@ export const dbService = {
   // ==========================
   // CANAIS & NICHOS (CHANNELS)
   // ==========================
+  ensureDefaultChannel() {
+    try {
+      const rawChatId = dbService.getSetting('telegramChatId', process.env.TELEGRAM_CHAT_ID || '');
+      if (!rawChatId) return;
+
+      const existing = db.prepare('SELECT 1 FROM channels WHERE chat_id = ?').get(rawChatId);
+      if (!existing) {
+        const defaultCat = dbService.getSetting('defaultCategory', process.env.DEFAULT_CATEGORY || 'esportes_suplementos');
+        const rawKw = dbService.getSetting('defaultKeywords', process.env.DEFAULT_KEYWORDS || '');
+        let kw = ['creatina', 'whey protein', 'suplemento', 'growth', 'soldiers nutrition'];
+        if (rawKw) {
+          try { kw = JSON.parse(rawKw); } catch { kw = rawKw.split(',').map((k: string) => k.trim()).filter(Boolean); }
+        }
+
+        dbService.saveChannel({
+          id: 'ch_fppromocoes',
+          name: 'FP PROMOÇÕES (Canal Atual)',
+          platform: 'telegram',
+          chatId: rawChatId,
+          category: defaultCat,
+          keywords: kw,
+          minDiscountPercent: 20,
+          minPrice: 15,
+          isActive: true
+        });
+      }
+    } catch {}
+  },
+
   getChannels(): ChannelConfig[] {
+    this.ensureDefaultChannel();
     const rows = db.prepare('SELECT * FROM channels ORDER BY created_at DESC').all() as any[];
     return rows.map(r => ({
       id: r.id,
@@ -186,6 +216,7 @@ export const dbService = {
   },
 
   getActiveChannels(): ChannelConfig[] {
+    this.ensureDefaultChannel();
     const rows = db.prepare('SELECT * FROM channels WHERE is_active = 1 ORDER BY created_at DESC').all() as any[];
     return rows.map(r => ({
       id: r.id,
@@ -248,6 +279,7 @@ export const dbService = {
 
   // Get total stats
   getStats() {
+    this.ensureDefaultChannel();
     const totalRow = db.prepare('SELECT COUNT(*) as total FROM posted_deals').get() as { total: number };
     const todayRow = db.prepare(`
       SELECT COUNT(*) as today FROM posted_deals 
