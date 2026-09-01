@@ -327,3 +327,21 @@ apiRouter.get('/logs', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// 14. Analytics de Cliques e Top Produtos Clicados
+apiRouter.get('/analytics/clicks', async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string, 10) || 10;
+    const [stats, topDeals] = await Promise.all([
+      dbService.getClicksStats(),
+      dbService.getTopClickedDeals(limit)
+    ]);
+    res.json({
+      success: true,
+      stats,
+      topDeals
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});

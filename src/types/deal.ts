@@ -64,6 +64,9 @@ export interface SystemSettings {
   defaultCategory?: string;
   defaultKeywords?: string[];
   customCopyTemplate?: string;
+  appBaseUrl?: string; // URL pública do servidor (ex: https://meubot.onrender.com) para links de rastreamento
+  peakHoursOnly?: boolean; // Se verdadeiro, só publica nas janelas de pico
+  peakHoursRanges?: string; // Ex: "07:30-09:30,11:45-14:00,18:30-22:30"
 }
 
 export interface AutopilotLog {
@@ -73,3 +76,32 @@ export interface AutopilotLog {
   message: string;
   details?: string;
 }
+
+export interface ClickRecord {
+  id?: number;
+  dealId: string;
+  channelId?: string;
+  targetUrl: string;
+  ipHash?: string;
+  userAgent?: string;
+  referer?: string;
+  clickedAt?: string;
+}
+
+export interface TopClickedDeal {
+  dealId: string;
+  title: string;
+  store: string;
+  currentPrice: number;
+  imageUrl?: string;
+  clicks: number;
+  lastClickedAt: string;
+}
+
+export interface ClickAnalyticsSummary {
+  totalClicks: number;
+  clicksToday: number;
+  clicksLast7Days: number;
+  topDeals: TopClickedDeal[];
+}
+

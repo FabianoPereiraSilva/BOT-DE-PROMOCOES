@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initSettings();
   initHunter();
   initLogs();
+  initAnalytics();
 
   // Carrega status e dados iniciais
   fetchStatus();
@@ -19,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchChannels();
   fetchSettings();
   fetchHistory();
+  fetchAnalytics();
 
   // Intervalo de atualização de status (15s)
   setInterval(fetchStatus, 15000);
@@ -45,6 +47,7 @@ function initNavigation() {
       }
 
       // Dispara ações ao trocar de aba
+      if (targetTab === 'analytics') fetchAnalytics();
       if (targetTab === 'channels') fetchChannels();
       if (targetTab === 'hunter') loadHunterDeals();
       if (targetTab === 'history') fetchHistory();
@@ -62,8 +65,13 @@ async function fetchStatus() {
     const data = await res.json();
 
     if (data.success) {
+      if (document.getElementById('stat-clicks-total')) {
+        document.getElementById('stat-clicks-total').textContent = data.stats.totalClicks || 0;
+      }
+      if (document.getElementById('stat-clicks-today')) {
+        document.getElementById('stat-clicks-today').textContent = data.stats.clicksToday || 0;
+      }
       document.getElementById('stat-channels').textContent = data.stats.activeChannels || 0;
-      document.getElementById('stat-today').textContent = data.stats.postedToday || 0;
       document.getElementById('stat-shopee').textContent = data.stats.shopeeCount || 0;
       document.getElementById('stat-ml').textContent = data.stats.mercadoLivreCount || 0;
 
@@ -81,6 +89,74 @@ async function fetchStatus() {
     }
   } catch (err) {
     console.error('Erro ao consultar status:', err);
+  }
+}
+
+// ==========================================
+// 2.1 ANALYTICS DE CLIQUES & CONVERSÃO
+// ==========================================
+function initAnalytics() {
+  const btnRefresh = document.getElementById('btn-refresh-analytics');
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', () => {
+      fetchAnalytics();
+      showToast('Métricas de cliques atualizadas!', 'success');
+    });
+  }
+}
+
+async function fetchAnalytics() {
+  const tbody = document.getElementById('analytics-top-deals-body');
+  if (!tbody) return;
+
+  try {
+    const res = await fetch('/api/analytics/clicks');
+    const data = await res.json();
+
+    if (data.success) {
+      if (document.getElementById('analytics-clicks-today')) {
+        document.getElementById('analytics-clicks-today').textContent = data.stats.clicksToday || 0;
+      }
+      if (document.getElementById('analytics-clicks-7d')) {
+        document.getElementById('analytics-clicks-7d').textContent = data.stats.clicksLast7Days || 0;
+      }
+      if (document.getElementById('analytics-clicks-total')) {
+        document.getElementById('analytics-clicks-total').textContent = data.stats.totalClicks || 0;
+      }
+
+      if (!data.topDeals || data.topDeals.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding: 24px; color: var(--text-muted);">Nenhum clique registrado ainda. Os cliques aparecerão aqui assim que seus membros clicarem nas ofertas postadas!</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      data.topDeals.forEach((deal, idx) => {
+        const tr = document.createElement('tr');
+        const posBadge = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `#${idx + 1}`));
+        const storeBadge = deal.store === 'shopee' ? '<span class="badge shopee">Shopee</span>' : '<span class="badge mercadolivre">Mercado Livre</span>';
+        const price = deal.currentPrice ? deal.currentPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-';
+        const lastClick = deal.lastClickedAt ? new Date(deal.lastClickedAt).toLocaleString('pt-BR') : '-';
+
+        tr.innerHTML = `
+          <td style="font-weight: 800; font-size: 1.1rem; text-align: center;">${posBadge}</td>
+          <td><img src="${deal.imageUrl || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>'}" class="table-thumb" alt="thumb"></td>
+          <td style="max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(deal.title)}">
+            <b>${escapeHtml(deal.title)}</b>
+          </td>
+          <td>${storeBadge}</td>
+          <td style="color: var(--accent-emerald); font-weight: bold;">${price}</td>
+          <td style="text-align: center;">
+            <span style="display: inline-block; padding: 4px 12px; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px; font-weight: 800;">
+              🔥 ${deal.clicks} clique(s)
+            </span>
+          </td>
+          <td style="font-size: 0.8rem; color: var(--text-muted);">${lastClick}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+  } catch (err) {
+    console.error('Erro ao buscar analytics:', err);
   }
 }
 
@@ -738,7 +814,10 @@ function initSettings() {
       minPrice: parseFloat(document.getElementById('setting-min-price').value),
       deduplicationHours: parseInt(document.getElementById('setting-dedup-hours').value, 10),
       defaultCategory: document.getElementById('setting-default-category').value,
-      defaultKeywords
+      defaultKeywords,
+      appBaseUrl: document.getElementById('setting-app-base-url')?.value.trim() || '',
+      peakHoursOnly: document.getElementById('setting-peak-hours-only')?.checked || false,
+      peakHoursRanges: document.getElementById('setting-peak-hours-ranges')?.value.trim() || '07:30-09:30,11:45-14:00,18:30-22:30'
     };
 
     try {
@@ -780,6 +859,15 @@ async function fetchSettings() {
       if (s.defaultCategory) document.getElementById('setting-default-category').value = s.defaultCategory;
       if (s.defaultKeywords && Array.isArray(s.defaultKeywords)) {
         document.getElementById('setting-default-keywords').value = s.defaultKeywords.join(', ');
+      }
+      if (document.getElementById('setting-app-base-url')) {
+        document.getElementById('setting-app-base-url').value = s.appBaseUrl || '';
+      }
+      if (document.getElementById('setting-peak-hours-only')) {
+        document.getElementById('setting-peak-hours-only').checked = !!s.peakHoursOnly;
+      }
+      if (document.getElementById('setting-peak-hours-ranges')) {
+        document.getElementById('setting-peak-hours-ranges').value = s.peakHoursRanges || '07:30-09:30,11:45-14:00,18:30-22:30';
       }
     }
   } catch (err) {

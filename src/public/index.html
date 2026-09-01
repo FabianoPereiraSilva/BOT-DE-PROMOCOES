@@ -27,6 +27,9 @@
         <button class="nav-btn active" data-tab="quick-post" id="nav-quick-post">
           <span class="icon">✨</span> Postagem Rápida
         </button>
+        <button class="nav-btn" data-tab="analytics" id="nav-analytics">
+          <span class="icon">📈</span> Conversão & Cliques
+        </button>
         <button class="nav-btn" data-tab="channels" id="nav-channels">
           <span class="icon">📢</span> Canais & Nichos
         </button>
@@ -55,18 +58,26 @@
     <!-- Metrics Bar -->
     <section class="stats-grid">
       <div class="stat-card">
-        <div class="stat-icon tg-gradient">📢</div>
+        <div class="stat-icon" style="background: linear-gradient(135deg, #10b981, #059669);">🖱️</div>
         <div class="stat-info">
-          <span class="stat-label">Canais Ativos</span>
-          <h2 class="stat-value" id="stat-channels">0</h2>
+          <span class="stat-label">Cliques Totais</span>
+          <h2 class="stat-value" id="stat-clicks-total">0</h2>
         </div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-icon today-gradient">🔥</div>
+        <div class="stat-icon today-gradient">📈</div>
         <div class="stat-info">
-          <span class="stat-label">Publicadas Hoje</span>
-          <h2 class="stat-value" id="stat-today">0</h2>
+          <span class="stat-label">Cliques Hoje</span>
+          <h2 class="stat-value" id="stat-clicks-today">0</h2>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon tg-gradient">📢</div>
+        <div class="stat-info">
+          <span class="stat-label">Canais Ativos</span>
+          <h2 class="stat-value" id="stat-channels">0</h2>
         </div>
       </div>
 
@@ -181,6 +192,93 @@
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    <!-- TAB: Analytics & Conversão de Cliques -->
+    <main class="tab-content" id="tab-analytics">
+      <div class="analytics-container">
+        <!-- Cards de Resumo -->
+        <div class="stats-grid" style="margin-bottom: 24px;">
+          <div class="stat-card" style="border-left: 4px solid #10b981;">
+            <div class="stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">🖱️</div>
+            <div class="stat-info">
+              <span class="stat-label">Cliques Hoje</span>
+              <h2 class="stat-value" id="analytics-clicks-today">0</h2>
+            </div>
+          </div>
+
+          <div class="stat-card" style="border-left: 4px solid #6366f1;">
+            <div class="stat-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">📊</div>
+            <div class="stat-info">
+              <span class="stat-label">Últimos 7 Dias</span>
+              <h2 class="stat-value" id="analytics-clicks-7d">0</h2>
+            </div>
+          </div>
+
+          <div class="stat-card" style="border-left: 4px solid #f59e0b;">
+            <div class="stat-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">⚡</div>
+            <div class="stat-info">
+              <span class="stat-label">Total Histórico</span>
+              <h2 class="stat-value" id="analytics-clicks-total">0</h2>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ranking Top Produtos Clicados -->
+        <div class="glass-card" style="margin-bottom: 24px;">
+          <div class="hunter-title-row">
+            <div>
+              <h2>🏆 Top 10 Produtos Mais Clicados no Telegram</h2>
+              <p>Descubra os produtos e marcas com maior interesse e clique pelo seu público para otimizar suas comissões.</p>
+            </div>
+            <button class="btn-secondary" id="btn-refresh-analytics" style="padding: 10px 18px;">
+              🔄 Atualizar Métricas
+            </button>
+          </div>
+
+          <div class="table-responsive" style="margin-top: 18px;">
+            <table class="deals-table">
+              <thead>
+                <tr>
+                  <th style="width: 50px;">Pos.</th>
+                  <th style="width: 70px;">Foto</th>
+                  <th>Produto</th>
+                  <th>Loja</th>
+                  <th>Preço</th>
+                  <th style="text-align: center;">🔥 Cliques Reais</th>
+                  <th>Último Clique</th>
+                </tr>
+              </thead>
+              <tbody id="analytics-top-deals-body">
+                <tr>
+                  <td colspan="7" class="text-center" style="padding: 24px; color: var(--text-muted);">
+                    Nenhum clique registrado ainda. Os cliques aparecerão aqui assim que seus membros clicarem nas ofertas postadas!
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Dicas de Otimização -->
+        <div class="glass-card" style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));">
+          <div class="card-header">
+            <h3>💡 Como Aumentar suas Vendas & Comissões</h3>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 12px; font-size: 0.9rem; color: var(--text-secondary);">
+            <div style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+              <h4 style="color: #60a5fa; margin-bottom: 6px;">⏰ Horários de Pico</h4>
+              <p>Ative a opção <b>Apenas Horários de Pico</b> nas Configurações para postar entre 11h45-14h e 18h30-22h30, onde ocorrem 78% das compras.</p>
+            </div>
+            <div style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+              <h4 style="color: #34d399; margin-bottom: 6px;">🎯 Nichos Específicos</h4>
+              <p>Canais temáticos (ex: só suplementos ou só tênis) convertem <b>3.5x mais</b> do que canais com ofertas aleatórias.</p>
+            </div>
+            <div style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; border: 1px solid var(--border-color);">
+              <h4 style="color: #fbbf24; margin-bottom: 6px;">🏷️ Fixar Marcas Fortes</h4>
+              <p>Marcas com alta autoridade (Growth, Nike, Apple, Soldiers) têm o menor tempo de decisão de compra do usuário.</p>
             </div>
           </div>
         </div>
@@ -454,20 +552,43 @@
                 <input type="number" id="setting-dedup-hours" min="1" max="720" value="72">
                 <small>Tempo em horas que um produto fica bloqueado de ser postado novamente.</small>
               </div>
+
+              <div class="form-group full-width toggle-group" style="margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 16px;">
+                <label class="switch-label">
+                  <span class="switch-title">⏰ Publicar Apenas em Horários de Pico (Alta Conversão):</span>
+                  <span class="switch-desc">Concentra as postagens nos momentos de maior compra dos brasileiros (Manhã, Almoço e Noite).</span>
+                </label>
+                <label class="switch">
+                  <input type="checkbox" id="setting-peak-hours-only">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="setting-peak-hours-ranges">Janelas de Horário de Pico (Horário de Brasília):</label>
+                <input type="text" id="setting-peak-hours-ranges" value="07:30-09:30,11:45-14:00,18:30-22:30">
+                <small>Formato: <code>HH:MM-HH:MM,HH:MM-HH:MM</code> separados por vírgula.</small>
+              </div>
             </div>
           </div>
 
-          <!-- Afiliados Section -->
+          <!-- Afiliados & Rastreamento Section -->
           <div class="glass-card settings-section">
             <div class="section-title">
               <span class="section-badge aff-badge">3</span>
               <div>
-                <h3>Seus Links & Credenciais de Afiliados</h3>
-                <p>Insira suas tags de afiliado da Shopee e do Mercado Livre para monetizar todos os links.</p>
+                <h3>Links de Afiliados & Rastreamento de Cliques</h3>
+                <p>Configure suas tags de afiliado e a URL pública para rastrear cliques em tempo real.</p>
               </div>
             </div>
 
             <div class="form-grid">
+              <div class="form-group full-width">
+                <label for="setting-app-base-url">🔗 URL Pública do seu Servidor (para rastrear cliques):</label>
+                <input type="text" id="setting-app-base-url" placeholder="Ex: https://bot-de-promocoes.onrender.com">
+                <small>Se preenchido com a URL do seu deploy no Render, os botões do Telegram usarão o encurtador inteligente <code>/r/:id</code> para registrar cada clique!</small>
+              </div>
+
               <div class="form-group full-width">
                 <label for="setting-ml-tag">Tag de Afiliado Mercado Livre (matt_tool ou código):</label>
                 <input type="text" id="setting-ml-tag" placeholder="Ex: matt_tool=12345678&matt_word=promo">

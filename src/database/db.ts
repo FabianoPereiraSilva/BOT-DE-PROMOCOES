@@ -94,6 +94,17 @@ export async function initDatabase(): Promise<void> {
         message TEXT NOT NULL,
         details TEXT
       );
+
+      CREATE TABLE IF NOT EXISTS clicks (
+        id SERIAL PRIMARY KEY,
+        deal_id TEXT NOT NULL,
+        channel_id TEXT DEFAULT 'default',
+        target_url TEXT NOT NULL,
+        ip_hash TEXT,
+        user_agent TEXT,
+        referer TEXT,
+        clicked_at TIMESTAMPTZ DEFAULT NOW()
+      );
     `);
 
     // Índices para performance
@@ -101,6 +112,8 @@ export async function initDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_posted_deals_store ON posted_deals(store);
       CREATE INDEX IF NOT EXISTS idx_posted_deals_channel ON posted_deals(channel_id);
       CREATE INDEX IF NOT EXISTS idx_posted_deals_posted_at ON posted_deals(posted_at);
+      CREATE INDEX IF NOT EXISTS idx_clicks_deal_id ON clicks(deal_id);
+      CREATE INDEX IF NOT EXISTS idx_clicks_clicked_at ON clicks(clicked_at);
     `);
 
     // Carrega o cache de settings
@@ -281,21 +294,107 @@ export const dbService = {
     await pool.query('DELETE FROM channels WHERE id = $1', [id]);
   },
 
-  // ── ESTATÍSTICAS ──────────────────────────────────────────
-  async getStats(): Promise<{
-    totalPosted: number;
-    postedToday: number;
-    shopeeCount: number;
-    mercadoLivreCount: number;
-    activeChannels: number;
+  // ── BUSCA DE DEAL POR ID ──────────────────────────────────
+  async getDealById(id: string): Promise<PostedDealRecord | null> {
+    const result = await pool.query(
+      'SELECT * FROM posted_deals WHERE id = $1 ORDER BY posted_at DESC LIMIT 1',
+      [id]
+    );
+    if (result.rowCount === 0) return null;
+    return result.rows[0] as PostedDealRecord;
+  },
+
+  // ── RASTREAMENTO DE CLIQUES (CLICKS & ANALYTICS) ───────────
+  async recordClick(params: {
+    dealId: string;
+    channelId?: string;
+    targetUrl: string;
+    ipHash?: string;
+    userAgent?: string;
+    referer?: string;
+  }): Promise<void> {
+    try {
+      await pool.query(
+        `INSERT INTO clicks (deal_id, channel_id, target_url, ip_hash, user_agent, referer, clicked_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        [
+          params.dealId,
+          params.channelId || 'default',
+          params.targetUrl,
+          params.ipHash || null,
+          params.userAgent ? params.userAgent.substring(0, 500) : null,
+          params.referer ? params.referer.substring(0, 500) : null
+        ]
+      );
+    } catch (err: any) {
+      console.error('Erro ao gravar clique:', err.message);
+    }
+  },
+
+  async getClicksStats(): Promise<{
+    totalClicks: number;
+    clicksToday: number;
+    clicksLast7Days: number;
   }> {
+    const [totalRes, todayRes, last7Res] = await Promise.all([
+      pool.query('SELECT COUNT(*) as total FROM clicks'),
+      pool.query('SELECT COUNT(*) as today FROM clicks WHERE DATE(clicked_at) = CURRENT_DATE'),
+      pool.query("SELECT COUNT(*) as last7 FROM clicks WHERE clicked_at >= NOW() - INTERVAL '7 days'")
+    ]);
+
+    return {
+      totalClicks: parseInt(totalRes.rows[0]?.total || '0'),
+      clicksToday: parseInt(todayRes.rows[0]?.today || '0'),
+      clicksLast7Days: parseInt(last7Res.rows[0]?.last7 || '0')
+    };
+  },
+
+  async getTopClickedDeals(limit = 10): Promise<{
+    dealId: string;
+    title: string;
+    store: string;
+    currentPrice: number;
+    imageUrl?: string;
+    clicks: number;
+    lastClickedAt: string;
+  }[]> {
+    const query = `
+      SELECT 
+        c.deal_id as "dealId",
+        COALESCE(d.title, 'Oferta #' || c.deal_id) as "title",
+        COALESCE(d.store, 'geral') as "store",
+        COALESCE(d.current_price, 0) as "currentPrice",
+        d.image_url as "imageUrl",
+        COUNT(c.id) as "clicks",
+        MAX(c.clicked_at) as "lastClickedAt"
+      FROM clicks c
+      LEFT JOIN posted_deals d ON c.deal_id = d.id
+      GROUP BY c.deal_id, d.title, d.store, d.current_price, d.image_url
+      ORDER BY "clicks" DESC
+      LIMIT $1
+    `;
+    const result = await pool.query(query, [limit]);
+    return result.rows.map((r: any) => ({
+      dealId: r.dealId,
+      title: r.title,
+      store: r.store,
+      currentPrice: parseFloat(r.currentPrice || '0'),
+      imageUrl: r.imageUrl || undefined,
+      clicks: parseInt(r.clicks || '0'),
+      lastClickedAt: r.lastClickedAt
+    }));
+  },
+
+  // ── ESTATÍSTICAS ──────────────────────────────────────────
+  async getStats() {
     await this.ensureDefaultChannel();
-    const [totalRes, todayRes, shopeeRes, mlRes, channelsRes] = await Promise.all([
+    const [totalRes, todayRes, shopeeRes, mlRes, channelsRes, clicksStats] = await Promise.all([
       pool.query('SELECT COUNT(*) as total FROM posted_deals'),
       pool.query("SELECT COUNT(*) as today FROM posted_deals WHERE DATE(posted_at) = CURRENT_DATE"),
       pool.query("SELECT COUNT(*) as shopee FROM posted_deals WHERE store = 'shopee'"),
       pool.query("SELECT COUNT(*) as ml FROM posted_deals WHERE store = 'mercadolivre'"),
-      pool.query('SELECT COUNT(*) as total FROM channels WHERE is_active = 1')
+      pool.query('SELECT COUNT(*) as total FROM channels WHERE is_active = 1'),
+      this.getClicksStats()
     ]);
 
     return {
@@ -303,7 +402,10 @@ export const dbService = {
       postedToday: parseInt(todayRes.rows[0]?.today || '0'),
       shopeeCount: parseInt(shopeeRes.rows[0]?.shopee || '0'),
       mercadoLivreCount: parseInt(mlRes.rows[0]?.ml || '0'),
-      activeChannels: parseInt(channelsRes.rows[0]?.total || '0')
+      activeChannels: parseInt(channelsRes.rows[0]?.total || '0'),
+      totalClicks: clicksStats.totalClicks,
+      clicksToday: clicksStats.clicksToday,
+      clicksLast7Days: clicksStats.clicksLast7Days
     };
   },
 

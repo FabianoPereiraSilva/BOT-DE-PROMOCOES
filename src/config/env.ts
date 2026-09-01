@@ -34,7 +34,10 @@ export function getSystemSettings(): SystemSettings {
     deduplicationHours: parseInt(dbService.getSetting('deduplicationHours', process.env.DEDUPLICATION_HOURS || '72'), 10),
     defaultCategory: dbService.getSetting('defaultCategory', process.env.DEFAULT_CATEGORY || 'esportes_suplementos'),
     defaultKeywords,
-    customCopyTemplate: dbService.getSetting('customCopyTemplate', '')
+    customCopyTemplate: dbService.getSetting('customCopyTemplate', ''),
+    appBaseUrl: dbService.getSetting('appBaseUrl', process.env.APP_BASE_URL || ''),
+    peakHoursOnly: dbService.getSetting('peakHoursOnly', process.env.PEAK_HOURS_ONLY || 'false') === 'true',
+    peakHoursRanges: dbService.getSetting('peakHoursRanges', process.env.PEAK_HOURS_RANGES || '07:30-09:30,11:45-14:00,18:30-22:30')
   };
 }
 
@@ -58,6 +61,9 @@ export async function updateSystemSettings(settings: Partial<SystemSettings>): P
   if (settings.defaultCategory !== undefined) ops.push(dbService.setSetting('defaultCategory', settings.defaultCategory));
   if (settings.defaultKeywords !== undefined) ops.push(dbService.setSetting('defaultKeywords', JSON.stringify(settings.defaultKeywords)));
   if (settings.customCopyTemplate !== undefined) ops.push(dbService.setSetting('customCopyTemplate', settings.customCopyTemplate));
+  if (settings.appBaseUrl !== undefined) ops.push(dbService.setSetting('appBaseUrl', settings.appBaseUrl.trim().replace(/\/$/, '')));
+  if (settings.peakHoursOnly !== undefined) ops.push(dbService.setSetting('peakHoursOnly', settings.peakHoursOnly ? 'true' : 'false'));
+  if (settings.peakHoursRanges !== undefined) ops.push(dbService.setSetting('peakHoursRanges', settings.peakHoursRanges));
 
   // Persiste todas as settings em paralelo
   await Promise.all(ops);

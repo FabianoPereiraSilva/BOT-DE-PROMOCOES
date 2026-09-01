@@ -65,6 +65,37 @@ export class AutopilotEngine {
     const nextDate = new Date(Date.now() + intervalMs);
     this.nextRunTime = nextDate.toLocaleTimeString('pt-BR');
   }
+  static isWithinPeakHours(rangesStr = '07:30-09:30,11:45-14:00,18:30-22:30'): { inPeak: boolean; currentBrt: string } {
+    try {
+      const now = new Date();
+      const brtFormatter = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      const currentBrt = brtFormatter.format(now);
+      const [currH, currM] = currentBrt.split(':').map(Number);
+      const currentMinutes = currH * 60 + currM;
+
+      const ranges = rangesStr.split(',').map(r => r.trim()).filter(Boolean);
+      for (const range of ranges) {
+        const [start, end] = range.split('-').map(s => s.trim());
+        if (!start || !end) continue;
+        const [sH, sM] = start.split(':').map(Number);
+        const [eH, eM] = end.split(':').map(Number);
+        const startMin = sH * 60 + sM;
+        const endMin = eH * 60 + eM;
+
+        if (currentMinutes >= startMin && currentMinutes <= endMin) {
+          return { inPeak: true, currentBrt };
+        }
+      }
+      return { inPeak: false, currentBrt };
+    } catch {
+      return { inPeak: true, currentBrt: 'N/A' };
+    }
+  }
 
   /**
    * Executa um ciclo completo de caça e publicação por canal e nicho
@@ -78,6 +109,18 @@ export class AutopilotEngine {
     this.lastRunTime = new Date().toLocaleTimeString('pt-BR');
 
     const settings = getSystemSettings();
+
+    // Verificação de Horários de Pico se ativado e não for disparo manual forçado
+    if (!force && settings.peakHoursOnly) {
+      const { inPeak, currentBrt } = this.isWithinPeakHours(settings.peakHoursRanges);
+      if (!inPeak) {
+        this.isRunning = false;
+        const msg = `[Horário Inteligente] Horário atual (${currentBrt} BRT) está fora das janelas de pico (${settings.peakHoursRanges || 'padrão'}). Ciclo adiado para o próximo intervalo.`;
+        await dbService.addLog('info', msg);
+        return { success: true, dealsFound: 0, dealsPosted: 0, message: msg };
+      }
+    }
+
     const activeChannels = await dbService.getActiveChannels();
 
     // Se não há canais específicos cadastrados, usa o canal padrão com o nicho configurado
@@ -154,7 +197,8 @@ export class AutopilotEngine {
           dealToPost,
           undefined,
           channel.chatId,
-          channel.customBotToken
+          channel.customBotToken,
+          channel.id
         );
 
         if (pubResult.success) {

@@ -74,7 +74,8 @@ export class TelegramPublisher {
     deal: Deal, 
     customBannerBuffer?: Buffer,
     targetChatId?: string,
-    customBotToken?: string
+    customBotToken?: string,
+    channelId?: string
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const settings = getSystemSettings();
     const botToken = customBotToken || settings.telegramBotToken;
@@ -82,17 +83,18 @@ export class TelegramPublisher {
 
     if (!botToken || !chatId) {
       const error = 'Telegram Bot Token ou Chat ID não configurados.';
-      dbService.addLog('error', 'Falha ao publicar no Telegram', error);
+      await dbService.addLog('error', 'Falha ao publicar no Telegram', error);
       return { success: false, error };
     }
 
-    const caption = CopyFormatter.formatTelegram(deal);
+    const buyUrl = CopyFormatter.getBuyUrl(deal, channelId);
+    const caption = CopyFormatter.formatTelegram(deal, channelId);
     const inlineKeyboard = {
       inline_keyboard: [
         [
           {
             text: '🔥 COMPRAR COM DESCONTO 🔥',
-            url: deal.affiliateUrl
+            url: buyUrl
           }
         ]
       ]

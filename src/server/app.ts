@@ -2,10 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import { apiRouter } from './routes/api.js';
 import { getSystemSettings } from '../config/env.js';
 import { AutopilotEngine } from '../autopilot/engine.js';
-import { initDatabase } from '../database/db.js';
+import { initDatabase, dbService } from '../database/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,9 +25,44 @@ app.use(express.static(publicDir));
 // Rotas da API
 app.use('/api', apiRouter);
 
+// ============================================================
+// Rota de Redirecionamento & Rastreamento de Cliques (/r/:dealId)
+// ============================================================
+app.get('/r/:dealId', async (req, res) => {
+  const { dealId } = req.params;
+  const channelId = (req.query.c as string) || 'default';
+
+  try {
+    const deal = await dbService.getDealById(dealId);
+    if (deal && deal.affiliate_url) {
+      const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+      const ipStr = Array.isArray(rawIp) ? rawIp[0] : rawIp.split(',')[0];
+      const ipHash = ipStr ? crypto.createHash('sha256').update(ipStr.trim()).digest('hex').substring(0, 16) : undefined;
+      const userAgent = (req.headers['user-agent'] as string) || undefined;
+      const referer = (req.headers['referer'] as string) || undefined;
+
+      await dbService.recordClick({
+        dealId,
+        channelId,
+        targetUrl: deal.affiliate_url,
+        ipHash,
+        userAgent,
+        referer
+      });
+
+      return res.redirect(302, deal.affiliate_url);
+    }
+  } catch (err: any) {
+    console.error('Erro ao redirecionar clique /r/:dealId:', err.message);
+  }
+
+  // Fallback se deal não for encontrado
+  res.redirect(302, '/');
+});
+
 // Fallback para SPA
 app.get('*', (req, res, next) => {
-  if (req.path.startsWith('/api')) return next();
+  if (req.path.startsWith('/api') || req.path.startsWith('/r/')) return next();
   res.sendFile(path.join(publicDir, 'index.html'));
 });
 

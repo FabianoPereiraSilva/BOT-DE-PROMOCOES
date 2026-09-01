@@ -13,11 +13,24 @@ export class CopyFormatter {
   }
 
   /**
+   * Obtém a URL de compra (rastreada via /r/:dealId se appBaseUrl configurado ou direta)
+   */
+  static getBuyUrl(deal: Deal, channelId?: string): string {
+    const settings = getSystemSettings();
+    if (settings.appBaseUrl) {
+      const chParam = channelId ? `?c=${encodeURIComponent(channelId)}` : '';
+      return `${settings.appBaseUrl}/r/${deal.id}${chParam}`;
+    }
+    return deal.affiliateUrl;
+  }
+
+  /**
    * Gera a copy promocional para Telegram (em formato HTML do Telegram)
    */
-  static formatTelegram(deal: Deal): string {
+  static formatTelegram(deal: Deal, channelId?: string): string {
     const settings = getSystemSettings();
     const customTemplate = settings.customCopyTemplate?.trim();
+    const buyUrl = this.getBuyUrl(deal, channelId);
 
     const storeEmoji = deal.store === 'shopee' ? '🟠' : '🟡';
     const storeName = deal.store === 'shopee' ? 'SHOPEE' : 'MERCADO LIVRE';
@@ -33,7 +46,7 @@ export class CopyFormatter {
         .replace(/{preco_atual}/gi, formattedCurrentPrice)
         .replace(/{preco_antigo}/gi, formattedOriginalPrice || '')
         .replace(/{desconto}/gi, discountText)
-        .replace(/{link}/gi, deal.affiliateUrl)
+        .replace(/{link}/gi, buyUrl)
         .replace(/{frete_gratis}/gi, deal.freeShipping ? '🚚 Frete Grátis' : '')
         .replace(/{cupom}/gi, deal.couponCode ? `🎟️ Cupom: <b>${deal.couponCode}</b>` : '');
     }
@@ -80,7 +93,7 @@ export class CopyFormatter {
     // Chamada para Ação
     lines.push('');
     lines.push(`🛒 <b>Compre com Desconto Seguro:</b>`);
-    lines.push(`👉 <a href="${deal.affiliateUrl}">${deal.affiliateUrl}</a>`);
+    lines.push(`👉 <a href="${buyUrl}">${buyUrl}</a>`);
     lines.push('');
     lines.push(`<i>⚡ O preço e o estoque podem mudar a qualquer momento!</i>`);
     lines.push('');
