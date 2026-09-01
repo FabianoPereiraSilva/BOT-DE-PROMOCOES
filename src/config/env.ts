@@ -27,7 +27,7 @@ export function getSystemSettings(): SystemSettings {
     shopeeAppId: dbService.getSetting('shopeeAppId', process.env.SHOPEE_APP_ID || ''),
     shopeeSecret: dbService.getSetting('shopeeSecret', process.env.SHOPEE_SECRET || ''),
     shopeeUniversalLinkPrefix: dbService.getSetting('shopeeUniversalLinkPrefix', process.env.SHOPEE_UNIVERSAL_LINK_PREFIX || 'https://s.shopee.com.br/'),
-    autopilotEnabled: dbService.getSetting('autopilotEnabled', process.env.AUTOPILOT_ENABLED || 'false') === 'true',
+    autopilotEnabled: dbService.getSetting('autopilotEnabled', process.env.AUTOPILOT_ENABLED || 'true') === 'true',
     autopilotIntervalMinutes: parseInt(dbService.getSetting('autopilotIntervalMinutes', process.env.AUTOPILOT_INTERVAL_MINUTES || '20'), 10),
     minDiscountPercent: parseFloat(dbService.getSetting('minDiscountPercent', process.env.MIN_DISCOUNT_PERCENT || '20')),
     minPrice: parseFloat(dbService.getSetting('minPrice', process.env.MIN_PRICE || '15')),
