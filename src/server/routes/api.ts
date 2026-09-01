@@ -245,14 +245,15 @@ apiRouter.post('/quick-post/publish', async (req: Request, res: Response) => {
   }
 });
 
-// 10. Visualizar Ofertas Caçadas ao Vivo (Hunter Live Stream por Categoria)
+// 10. Visualizar Ofertas Caçadas ao Vivo (Hunter Live Stream por Categoria ou Marca)
 apiRouter.get('/deals/hunter-preview', async (req: Request, res: Response) => {
   const category = (req.query.category as string) || 'geral';
+  const query = (req.query.query as string) || '';
   const settings = getSystemSettings();
 
   try {
     const [mlDeals, shopeeDeals] = await Promise.allSettled([
-      MercadoLivreHunter.huntDeals(settings.minDiscountPercent, settings.minPrice, category),
+      MercadoLivreHunter.huntDeals(settings.minDiscountPercent, settings.minPrice, category, [], query),
       ShopeeHunter.huntDeals(settings.minDiscountPercent, settings.minPrice, category)
     ]);
 
@@ -265,6 +266,7 @@ apiRouter.get('/deals/hunter-preview', async (req: Request, res: Response) => {
     res.json({
       success: true,
       category,
+      query,
       count: deals.length,
       deals
     });

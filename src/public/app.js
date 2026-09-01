@@ -485,8 +485,27 @@ async function renderBannerPreview(deal) {
 // 6. RADAR DE OFERTAS (HUNTER)
 // ==========================================
 function initHunter() {
-  document.getElementById('btn-refresh-hunter').addEventListener('click', loadHunterDeals);
-  document.getElementById('hunter-category-filter').addEventListener('change', loadHunterDeals);
+  document.getElementById('btn-refresh-hunter').addEventListener('click', () => loadHunterDeals());
+  document.getElementById('hunter-category-filter').addEventListener('change', () => {
+    document.getElementById('hunter-brand-search-input').value = '';
+    loadHunterDeals();
+  });
+
+  const searchInput = document.getElementById('hunter-brand-search-input');
+  const btnSearch = document.getElementById('btn-search-brand');
+
+  btnSearch.addEventListener('click', () => {
+    const query = searchInput.value.trim();
+    loadHunterDeals(query);
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const query = searchInput.value.trim();
+      loadHunterDeals(query);
+    }
+  });
 
   document.getElementById('btn-trigger-autopilot').addEventListener('click', async () => {
     const btn = document.getElementById('btn-trigger-autopilot');
@@ -512,23 +531,28 @@ function initHunter() {
   });
 }
 
-async function loadHunterDeals() {
+async function loadHunterDeals(customQuery = '') {
   const grid = document.getElementById('hunter-deals-grid');
   const category = document.getElementById('hunter-category-filter').value;
+  const searchInput = document.getElementById('hunter-brand-search-input');
+  const query = customQuery || searchInput.value.trim();
+
+  const label = query ? `Marca: "${query}"` : getCategoryLabel(category);
 
   grid.innerHTML = `
     <div class="loading-state" style="grid-column: 1/-1; text-align: center; padding: 40px;">
       <div class="spinner" style="margin: 0 auto 16px;"></div>
-      <p>Varrendo Shopee e Mercado Livre em busca de ofertas (${getCategoryLabel(category)})...</p>
+      <p>Varrendo Shopee e Mercado Livre em busca de ofertas (${escapeHtml(label)})...</p>
     </div>
   `;
 
   try {
-    const res = await fetch(`/api/deals/hunter-preview?category=${category}`);
+    const url = `/api/deals/hunter-preview?category=${encodeURIComponent(category)}&query=${encodeURIComponent(query)}`;
+    const res = await fetch(url);
     const data = await res.json();
 
     if (!data.success || !data.deals || data.deals.length === 0) {
-      grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); padding: 40px;">Nenhuma oferta encontrada para este nicho no momento.</div>`;
+      grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); padding: 40px;">Nenhuma oferta encontrada para ${escapeHtml(label)} no momento.</div>`;
       return;
     }
 

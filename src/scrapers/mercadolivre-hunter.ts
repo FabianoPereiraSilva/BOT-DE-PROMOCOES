@@ -129,28 +129,35 @@ export class MercadoLivreHunter {
     minDiscount = 20, 
     minPrice = 15, 
     categoryKey = 'geral', 
-    customKeywords: string[] = []
+    customKeywords: string[] = [],
+    searchQuery?: string
   ): Promise<Deal[]> {
     const deals: Deal[] = [];
     const targetUrls: string[] = [];
 
-    const preset = CATEGORY_PRESETS[categoryKey];
-
-    if (categoryKey === 'geral' || !preset) {
-      targetUrls.push('https://www.mercadolivre.com.br/ofertas?promotion_type=deal_of_the_day');
-      targetUrls.push('https://www.mercadolivre.com.br/ofertas?promotion_type=lightning');
-      targetUrls.push('https://www.mercadolivre.com.br/ofertas');
+    // Se houver busca direta por marca/termo (ex: "Nike", "Apple", "Growth")
+    if (searchQuery && searchQuery.trim().length > 0) {
+      const formatted = encodeURIComponent(searchQuery.trim().replace(/\s+/g, '-'));
+      targetUrls.push(`https://lista.mercadolivre.com.br/${formatted}_Desconto_${minDiscount}-100`);
+      targetUrls.push(`https://lista.mercadolivre.com.br/${formatted}`);
     } else {
-      // Se tiver categoria definida (ex: esportes_suplementos), busca palavras-chave do nicho
-      const keywords = customKeywords.length > 0 ? customKeywords : preset.defaultKeywords;
-      
-      for (const kw of keywords.slice(0, 3)) { // Usa até 3 palavras-chave por varredura
-        const formattedKw = encodeURIComponent(kw.replace(/\s+/g, '-'));
-        targetUrls.push(`https://lista.mercadolivre.com.br/${formattedKw}_Desconto_${minDiscount}-100`);
-      }
+      const preset = CATEGORY_PRESETS[categoryKey];
 
-      if (preset.mlCategoryId) {
-        targetUrls.push(`https://www.mercadolivre.com.br/ofertas?category=${preset.mlCategoryId}`);
+      if (categoryKey === 'geral' || !preset) {
+        targetUrls.push('https://www.mercadolivre.com.br/ofertas?promotion_type=deal_of_the_day');
+        targetUrls.push('https://www.mercadolivre.com.br/ofertas?promotion_type=lightning');
+        targetUrls.push('https://www.mercadolivre.com.br/ofertas');
+      } else {
+        const keywords = customKeywords.length > 0 ? customKeywords : preset.defaultKeywords;
+        
+        for (const kw of keywords.slice(0, 3)) {
+          const formattedKw = encodeURIComponent(kw.replace(/\s+/g, '-'));
+          targetUrls.push(`https://lista.mercadolivre.com.br/${formattedKw}_Desconto_${minDiscount}-100`);
+        }
+
+        if (preset.mlCategoryId) {
+          targetUrls.push(`https://www.mercadolivre.com.br/ofertas?category=${preset.mlCategoryId}`);
+        }
       }
     }
 

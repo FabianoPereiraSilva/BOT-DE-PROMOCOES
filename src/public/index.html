@@ -276,7 +276,7 @@
           <div class="hunter-title-row">
             <div>
               <h2>🎯 Radar de Ofertas em Tempo Real</h2>
-              <p>Ofertas com os maiores descontos garimpadas automaticamente na Shopee e Mercado Livre por nicho.</p>
+              <p>Ofertas com os maiores descontos garimpadas automaticamente na Shopee e Mercado Livre por nicho ou marca.</p>
             </div>
             <div class="hunter-actions">
               <select id="hunter-category-filter" class="custom-select" style="min-width: 220px;">
@@ -288,12 +288,25 @@
                 <option value="games_informatica">🎮 Games & Informática</option>
               </select>
               <button class="btn-secondary" id="btn-refresh-hunter">
-                🔍 Caçar Agora
+                🔄 Atualizar
               </button>
               <button class="btn-primary" id="btn-trigger-autopilot">
-                ⚡ Disparar Ciclo Autônomo
+                ⚡ Disparar Ciclo
               </button>
             </div>
+          </div>
+
+          <!-- Barra de Busca Direta por Marca ou Termo -->
+          <div class="hunter-search-row" style="margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <input 
+              type="text" 
+              id="hunter-brand-search-input" 
+              placeholder="🏷️ Buscar por Marca ou Produto (ex: Nike, Apple, Growth, Stanley, Xiaomi, Samsung)..." 
+              style="flex: 1; min-width: 240px; padding: 12px 18px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--border-color); border-radius: var(--radius-md); color: var(--text-primary); font-size: 0.92rem; outline: none;"
+            >
+            <button class="btn-primary" id="btn-search-brand" style="padding: 12px 22px;">
+              🔍 Buscar Marca
+            </button>
           </div>
         </div>
 
