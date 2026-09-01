@@ -1,6 +1,10 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import dns from 'dns';
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+// Força resolução DNS via IPv4 (corrige ENETUNREACH no Render/Supabase)
+dns.setDefaultResultOrder('ipv4first');
 
 import { Pool, PoolClient } from 'pg';
 import { PostedDealRecord, AutopilotLog, SystemSettings, ChannelConfig } from '../types/deal.js';
