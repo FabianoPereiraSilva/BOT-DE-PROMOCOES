@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import { apiRouter } from './routes/api.js';
 import { getSystemSettings } from '../config/env.js';
 import { AutopilotEngine } from '../autopilot/engine.js';
-import { dbService } from '../database/db.js';
+import { initDatabase } from '../database/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,23 +30,40 @@ app.get('*', (req, res, next) => {
   res.sendFile(path.join(publicDir, 'index.html'));
 });
 
-// Inicialização do Servidor
+// ============================================================
+// Inicialização Assíncrona do Servidor
+// ============================================================
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 
-app.listen(Number(PORT), HOST, () => {
-  console.log('====================================================');
-  console.log(`🚀 BOT DE PROMOÇÕES (SHOPEE & MERCADO LIVRE -> TELEGRAM)`);
-  console.log(`🌐 Painel Web: http://localhost:${PORT}`);
-  console.log('====================================================');
+async function bootstrap() {
+  try {
+    console.log('====================================================');
+    console.log('🚀 BOT DE PROMOÇÕES (SHOPEE & MERCADO LIVRE → TELEGRAM)');
+    console.log('====================================================');
 
-  dbService.addLog('info', `Servidor iniciado com sucesso na porta ${PORT}`);
+    // 1. Conecta ao PostgreSQL e inicializa schema + cache de settings
+    console.log('⏳ Conectando ao PostgreSQL (Supabase)...');
+    await initDatabase();
 
-  // Inicia o motor do piloto automático se estiver habilitado
-  const settings = getSystemSettings();
-  if (settings.autopilotEnabled) {
-    AutopilotEngine.start();
-  } else {
-    console.log('ℹ️  Piloto automático pausado. Ative pelo Painel Web para iniciar a caça 24/7.');
+    // 2. Inicia o servidor HTTP
+    app.listen(Number(PORT), HOST, async () => {
+      console.log(`🌐 Painel Web: http://localhost:${PORT}`);
+      console.log('====================================================');
+
+      // 3. Inicia o piloto automático se habilitado
+      const settings = getSystemSettings();
+      if (settings.autopilotEnabled) {
+        AutopilotEngine.start();
+      } else {
+        console.log('ℹ️  Piloto automático pausado. Ative pelo Painel Web para iniciar a caça 24/7.');
+      }
+    });
+
+  } catch (err: any) {
+    console.error('❌ Falha crítica ao iniciar o servidor:', err.message);
+    process.exit(1);
   }
-});
+}
+
+bootstrap();

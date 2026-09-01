@@ -1,124 +1,155 @@
-import Database from 'better-sqlite3';
+import dotenv from 'dotenv';
 import path from 'path';
-import fs from 'fs';
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
+import { Pool, PoolClient } from 'pg';
 import { PostedDealRecord, AutopilotLog, SystemSettings, ChannelConfig } from '../types/deal.js';
 
-// Define database path
-const DATA_DIR = path.resolve(process.cwd(), 'data');
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+// ============================================================
+// POOL DE CONEXÃO COM POSTGRESQL (SUPABASE)
+// ============================================================
+const DATABASE_URL = process.env.DATABASE_URL || '';
+
+if (!DATABASE_URL) {
+  console.warn('⚠️  DATABASE_URL não configurado! Usando fallback de desenvolvimento.');
 }
 
-const DB_PATH = path.join(DATA_DIR, 'deals_database.sqlite');
-export const db = new Database(DB_PATH);
+export const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: DATABASE_URL ? { rejectUnauthorized: false } : false,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000
+});
 
-// Enable WAL mode for high concurrent performance
-db.pragma('journal_mode = WAL');
+pool.on('error', (err) => {
+  console.error('PostgreSQL Pool Error:', err.message);
+});
 
-// Initialize database schema with auto-migrations
-export function initDatabase() {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS posted_deals (
-      id TEXT,
-      channel_id TEXT DEFAULT 'default',
-      category TEXT DEFAULT 'geral',
-      store TEXT NOT NULL,
-      title TEXT NOT NULL,
-      original_price REAL,
-      current_price REAL NOT NULL,
-      discount_percent REAL,
-      image_url TEXT,
-      original_url TEXT NOT NULL,
-      affiliate_url TEXT NOT NULL,
-      telegram_message_id TEXT,
-      posted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (id, channel_id)
-    );
+// ============================================================
+// CACHE IN-MEMORY DE SETTINGS (evita query a cada leitura)
+// ============================================================
+let settingsCache = new Map<string, string>();
+let settingsCacheLoaded = false;
 
-    CREATE TABLE IF NOT EXISTS channels (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      platform TEXT NOT NULL DEFAULT 'telegram',
-      chat_id TEXT NOT NULL,
-      category TEXT NOT NULL DEFAULT 'geral',
-      keywords TEXT,
-      min_discount REAL NOT NULL DEFAULT 20,
-      min_price REAL NOT NULL DEFAULT 15,
-      is_active INTEGER NOT NULL DEFAULT 1,
-      custom_bot_token TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+async function loadSettingsCache(client: PoolClient) {
+  const result = await client.query('SELECT key, value FROM settings');
+  settingsCache = new Map(result.rows.map((r: any) => [r.key, r.value]));
+  settingsCacheLoaded = true;
+}
 
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      level TEXT NOT NULL,
-      message TEXT NOT NULL,
-      details TEXT
-    );
-  `);
-
-  // Migrações seguras de colunas existentes
+// ============================================================
+// INICIALIZAÇÃO DO SCHEMA DO BANCO
+// ============================================================
+export async function initDatabase(): Promise<void> {
+  const client = await pool.connect();
   try {
-    const tableInfo = db.prepare("PRAGMA table_info(posted_deals)").all() as any[];
-    const columnNames = tableInfo.map(c => c.name);
+    // Cria todas as tabelas se não existirem
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS posted_deals (
+        id TEXT NOT NULL,
+        channel_id TEXT NOT NULL DEFAULT 'default',
+        category TEXT DEFAULT 'geral',
+        store TEXT NOT NULL,
+        title TEXT NOT NULL,
+        original_price NUMERIC,
+        current_price NUMERIC NOT NULL,
+        discount_percent NUMERIC,
+        image_url TEXT,
+        original_url TEXT NOT NULL,
+        affiliate_url TEXT NOT NULL,
+        telegram_message_id TEXT,
+        posted_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (id, channel_id)
+      );
 
-    if (!columnNames.includes('channel_id')) {
-      db.exec("ALTER TABLE posted_deals ADD COLUMN channel_id TEXT DEFAULT 'default'");
-    }
-    if (!columnNames.includes('category')) {
-      db.exec("ALTER TABLE posted_deals ADD COLUMN category TEXT DEFAULT 'geral'");
-    }
+      CREATE TABLE IF NOT EXISTS channels (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        platform TEXT NOT NULL DEFAULT 'telegram',
+        chat_id TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'geral',
+        keywords TEXT,
+        min_discount NUMERIC NOT NULL DEFAULT 20,
+        min_price NUMERIC NOT NULL DEFAULT 15,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        custom_bot_token TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
 
-    db.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS logs (
+        id SERIAL PRIMARY KEY,
+        timestamp TIMESTAMPTZ DEFAULT NOW(),
+        level TEXT NOT NULL,
+        message TEXT NOT NULL,
+        details TEXT
+      );
+    `);
+
+    // Índices para performance
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_posted_deals_store ON posted_deals(store);
       CREATE INDEX IF NOT EXISTS idx_posted_deals_channel ON posted_deals(channel_id);
       CREATE INDEX IF NOT EXISTS idx_posted_deals_posted_at ON posted_deals(posted_at);
     `);
-  } catch (migErr) {
-    // Continua caso já existam
+
+    // Carrega o cache de settings
+    await loadSettingsCache(client);
+
+    console.log('✅ PostgreSQL (Supabase) conectado e schema inicializado com sucesso!');
+  } catch (err: any) {
+    console.error('❌ Erro ao inicializar banco de dados PostgreSQL:', err.message);
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
-// Database Helper Functions
+// ============================================================
+// dbService - API ASSÍNCRONA COMPLETA
+// ============================================================
 export const dbService = {
-  // Check if deal was already posted anywhere within deduplication window
-  isDealAlreadyPosted(deal: { id: string; originalUrl?: string; title?: string }, channelId = 'default', hoursThreshold = 72): boolean {
-    const cleanId = deal.id;
-    const cleanUrl = (deal.originalUrl || '').split('?')[0].split('#')[0];
-    const normalizedTitle = (deal.title || '').toLowerCase().trim().replace(/[^a-z0-9]/g, ' ').split(/\s+/).slice(0, 5).join(' ');
 
-    const stmt = db.prepare(`
-      SELECT 1 FROM posted_deals 
-      WHERE (
-        id = ? 
-        OR (length(?) > 10 AND original_url LIKE ?)
-        OR (length(?) > 5 AND lower(title) LIKE ?)
-      )
-      AND datetime(posted_at) >= datetime('now', '-' || ? || ' hours')
-      LIMIT 1
-    `);
-
-    const result = stmt.get(
-      cleanId,
-      cleanUrl,
-      `%${cleanUrl}%`,
-      normalizedTitle,
-      `%${normalizedTitle}%`,
-      hoursThreshold
+  // ── DEDUPLICAÇÃO ──────────────────────────────────────────
+  /**
+   * Retorna um Set com hashes recentes (ID + URL limpa + título normalizado)
+   * usado para filtrar duplicatas de forma eficiente no ciclo do autopilot.
+   */
+  async getRecentPostedHashes(hoursThreshold = 72): Promise<Set<string>> {
+    const result = await pool.query(
+      `SELECT id, original_url, title FROM posted_deals
+       WHERE posted_at >= NOW() - INTERVAL '${hoursThreshold} hours'`
     );
 
-    return !!result;
+    const hashes = new Set<string>();
+    for (const row of result.rows) {
+      if (row.id) hashes.add(`id:${row.id}`);
+      if (row.original_url) {
+        const cleanUrl = row.original_url.split('?')[0].split('#')[0];
+        if (cleanUrl.length > 10) hashes.add(`url:${cleanUrl}`);
+      }
+      if (row.title) {
+        const normTitle = row.title
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, ' ')
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 5)
+          .join(' ');
+        if (normTitle.length > 5) hashes.add(`title:${normTitle}`);
+      }
+    }
+    return hashes;
   },
 
-  // Record a posted deal
-  recordPostedDeal(deal: {
+  // ── DEALS POSTADOS ────────────────────────────────────────
+  async recordPostedDeal(deal: {
     id: string;
     channelId?: string;
     category?: string;
@@ -127,62 +158,60 @@ export const dbService = {
     originalPrice?: number;
     currentPrice: number;
     discountPercent?: number;
-    imageUrl: string;
+    imageUrl?: string;
     originalUrl: string;
     affiliateUrl: string;
     telegramMessageId?: string;
-  }) {
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO posted_deals (
-        id, channel_id, category, store, title, original_price, current_price, 
+  }): Promise<void> {
+    await pool.query(
+      `INSERT INTO posted_deals (
+        id, channel_id, category, store, title, original_price, current_price,
         discount_percent, image_url, original_url, affiliate_url, telegram_message_id, posted_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    `);
-
-    return stmt.run(
-      deal.id,
-      deal.channelId || 'default',
-      deal.category || 'geral',
-      deal.store,
-      deal.title,
-      deal.originalPrice || null,
-      deal.currentPrice,
-      deal.discountPercent || null,
-      deal.imageUrl,
-      deal.originalUrl,
-      deal.affiliateUrl,
-      deal.telegramMessageId || null
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, NOW())
+      ON CONFLICT (id, channel_id) DO UPDATE SET
+        current_price = EXCLUDED.current_price,
+        posted_at = NOW()`,
+      [
+        deal.id,
+        deal.channelId || 'default',
+        deal.category || 'geral',
+        deal.store,
+        deal.title,
+        deal.originalPrice ?? null,
+        deal.currentPrice,
+        deal.discountPercent ?? null,
+        deal.imageUrl ?? null,
+        deal.originalUrl,
+        deal.affiliateUrl,
+        deal.telegramMessageId ?? null
+      ]
     );
   },
 
-  // Get recent posted deals
-  getRecentPostedDeals(limit = 50): PostedDealRecord[] {
-    const stmt = db.prepare(`
-      SELECT * FROM posted_deals 
-      ORDER BY posted_at DESC 
-      LIMIT ?
-    `);
-    return stmt.all(limit) as PostedDealRecord[];
+  async getRecentPostedDeals(limit = 50): Promise<PostedDealRecord[]> {
+    const result = await pool.query(
+      'SELECT * FROM posted_deals ORDER BY posted_at DESC LIMIT $1',
+      [limit]
+    );
+    return result.rows as PostedDealRecord[];
   },
 
-  // ==========================
-  // CANAIS & NICHOS (CHANNELS)
-  // ==========================
-  ensureDefaultChannel() {
+  // ── CANAIS & NICHOS ───────────────────────────────────────
+  async ensureDefaultChannel(): Promise<void> {
     try {
-      const rawChatId = dbService.getSetting('telegramChatId', process.env.TELEGRAM_CHAT_ID || '');
+      const rawChatId = this.getSetting('telegramChatId', process.env.TELEGRAM_CHAT_ID || '');
       if (!rawChatId) return;
 
-      const existing = db.prepare('SELECT 1 FROM channels WHERE chat_id = ?').get(rawChatId);
-      if (!existing) {
-        const defaultCat = dbService.getSetting('defaultCategory', process.env.DEFAULT_CATEGORY || 'esportes_suplementos');
-        const rawKw = dbService.getSetting('defaultKeywords', process.env.DEFAULT_KEYWORDS || '');
+      const existing = await pool.query('SELECT 1 FROM channels WHERE chat_id = $1', [rawChatId]);
+      if (existing.rowCount === 0) {
+        const defaultCat = this.getSetting('defaultCategory', process.env.DEFAULT_CATEGORY || 'esportes_suplementos');
+        const rawKw = this.getSetting('defaultKeywords', process.env.DEFAULT_KEYWORDS || '');
         let kw = ['creatina', 'whey protein', 'suplemento', 'growth', 'soldiers nutrition'];
         if (rawKw) {
           try { kw = JSON.parse(rawKw); } catch { kw = rawKw.split(',').map((k: string) => k.trim()).filter(Boolean); }
         }
 
-        dbService.saveChannel({
+        await this.saveChannel({
           id: 'ch_fppromocoes',
           name: 'FP PROMOÇÕES (Canal Atual)',
           platform: 'telegram',
@@ -197,147 +226,140 @@ export const dbService = {
     } catch {}
   },
 
-  getChannels(): ChannelConfig[] {
-    this.ensureDefaultChannel();
-    const rows = db.prepare('SELECT * FROM channels ORDER BY created_at DESC').all() as any[];
-    return rows.map(r => ({
-      id: r.id,
-      name: r.name,
-      platform: r.platform,
-      chatId: r.chat_id,
-      category: r.category,
-      keywords: r.keywords ? JSON.parse(r.keywords) : [],
-      minDiscountPercent: r.min_discount,
-      minPrice: r.min_price,
-      isActive: r.is_active === 1,
-      customBotToken: r.custom_bot_token || undefined,
-      createdAt: r.created_at
-    }));
+  async getChannels(): Promise<ChannelConfig[]> {
+    await this.ensureDefaultChannel();
+    const result = await pool.query('SELECT * FROM channels ORDER BY created_at DESC');
+    return result.rows.map((r: any) => this._mapChannel(r));
   },
 
-  getActiveChannels(): ChannelConfig[] {
-    this.ensureDefaultChannel();
-    const rows = db.prepare('SELECT * FROM channels WHERE is_active = 1 ORDER BY created_at DESC').all() as any[];
-    return rows.map(r => ({
-      id: r.id,
-      name: r.name,
-      platform: r.platform,
-      chatId: r.chat_id,
-      category: r.category,
-      keywords: r.keywords ? JSON.parse(r.keywords) : [],
-      minDiscountPercent: r.min_discount,
-      minPrice: r.min_price,
-      isActive: true,
-      customBotToken: r.custom_bot_token || undefined,
-      createdAt: r.created_at
-    }));
+  async getActiveChannels(): Promise<ChannelConfig[]> {
+    await this.ensureDefaultChannel();
+    const result = await pool.query('SELECT * FROM channels WHERE is_active = 1 ORDER BY created_at DESC');
+    return result.rows.map((r: any) => this._mapChannel(r));
   },
 
-  getChannelById(id: string): ChannelConfig | null {
-    const r = db.prepare('SELECT * FROM channels WHERE id = ?').get(id) as any;
-    if (!r) return null;
-    return {
-      id: r.id,
-      name: r.name,
-      platform: r.platform,
-      chatId: r.chat_id,
-      category: r.category,
-      keywords: r.keywords ? JSON.parse(r.keywords) : [],
-      minDiscountPercent: r.min_discount,
-      minPrice: r.min_price,
-      isActive: r.is_active === 1,
-      customBotToken: r.custom_bot_token || undefined,
-      createdAt: r.created_at
-    };
+  async getChannelById(id: string): Promise<ChannelConfig | null> {
+    const result = await pool.query('SELECT * FROM channels WHERE id = $1', [id]);
+    if (result.rowCount === 0) return null;
+    return this._mapChannel(result.rows[0]);
   },
 
-  saveChannel(channel: ChannelConfig) {
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO channels (
-        id, name, platform, chat_id, category, keywords, min_discount, min_price, is_active, custom_bot_token, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM channels WHERE id = ?), datetime('now')))
-    `);
-
-    stmt.run(
-      channel.id,
-      channel.name,
-      channel.platform || 'telegram',
-      channel.chatId,
-      channel.category || 'geral',
-      channel.keywords ? JSON.stringify(channel.keywords) : '[]',
-      channel.minDiscountPercent || 20,
-      channel.minPrice || 15,
-      channel.isActive ? 1 : 0,
-      channel.customBotToken || null,
-      channel.id
+  async saveChannel(channel: ChannelConfig): Promise<void> {
+    await pool.query(
+      `INSERT INTO channels (id, name, platform, chat_id, category, keywords, min_discount, min_price, is_active, custom_bot_token, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, NOW())
+       ON CONFLICT (id) DO UPDATE SET
+         name = EXCLUDED.name,
+         platform = EXCLUDED.platform,
+         chat_id = EXCLUDED.chat_id,
+         category = EXCLUDED.category,
+         keywords = EXCLUDED.keywords,
+         min_discount = EXCLUDED.min_discount,
+         min_price = EXCLUDED.min_price,
+         is_active = EXCLUDED.is_active,
+         custom_bot_token = EXCLUDED.custom_bot_token`,
+      [
+        channel.id,
+        channel.name,
+        channel.platform || 'telegram',
+        channel.chatId,
+        channel.category || 'geral',
+        channel.keywords ? JSON.stringify(channel.keywords) : '[]',
+        channel.minDiscountPercent || 20,
+        channel.minPrice || 15,
+        channel.isActive ? 1 : 0,
+        channel.customBotToken || null
+      ]
     );
   },
 
-  deleteChannel(id: string) {
-    return db.prepare('DELETE FROM channels WHERE id = ?').run(id);
+  async deleteChannel(id: string): Promise<void> {
+    await pool.query('DELETE FROM channels WHERE id = $1', [id]);
   },
 
-  // Get total stats
-  getStats() {
-    this.ensureDefaultChannel();
-    const totalRow = db.prepare('SELECT COUNT(*) as total FROM posted_deals').get() as { total: number };
-    const todayRow = db.prepare(`
-      SELECT COUNT(*) as today FROM posted_deals 
-      WHERE date(posted_at) = date('now')
-    `).get() as { today: number };
-    const shopeeRow = db.prepare(`
-      SELECT COUNT(*) as shopee FROM posted_deals WHERE store = 'shopee'
-    `).get() as { shopee: number };
-    const mlRow = db.prepare(`
-      SELECT COUNT(*) as ml FROM posted_deals WHERE store = 'mercadolivre'
-    `).get() as { ml: number };
-    const channelsRow = db.prepare('SELECT COUNT(*) as total FROM channels WHERE is_active = 1').get() as { total: number };
+  // ── ESTATÍSTICAS ──────────────────────────────────────────
+  async getStats(): Promise<{
+    totalPosted: number;
+    postedToday: number;
+    shopeeCount: number;
+    mercadoLivreCount: number;
+    activeChannels: number;
+  }> {
+    await this.ensureDefaultChannel();
+    const [totalRes, todayRes, shopeeRes, mlRes, channelsRes] = await Promise.all([
+      pool.query('SELECT COUNT(*) as total FROM posted_deals'),
+      pool.query("SELECT COUNT(*) as today FROM posted_deals WHERE DATE(posted_at) = CURRENT_DATE"),
+      pool.query("SELECT COUNT(*) as shopee FROM posted_deals WHERE store = 'shopee'"),
+      pool.query("SELECT COUNT(*) as ml FROM posted_deals WHERE store = 'mercadolivre'"),
+      pool.query('SELECT COUNT(*) as total FROM channels WHERE is_active = 1')
+    ]);
 
     return {
-      totalPosted: totalRow.total || 0,
-      postedToday: todayRow.today || 0,
-      shopeeCount: shopeeRow.shopee || 0,
-      mercadoLivreCount: mlRow.ml || 0,
-      activeChannels: channelsRow.total || 0
+      totalPosted: parseInt(totalRes.rows[0]?.total || '0'),
+      postedToday: parseInt(todayRes.rows[0]?.today || '0'),
+      shopeeCount: parseInt(shopeeRes.rows[0]?.shopee || '0'),
+      mercadoLivreCount: parseInt(mlRes.rows[0]?.ml || '0'),
+      activeChannels: parseInt(channelsRes.rows[0]?.total || '0')
     };
   },
 
-  // Save or update settings in DB
-  setSetting(key: string, value: string) {
-    const stmt = db.prepare(`
-      INSERT OR REPLACE INTO settings (key, value, updated_at) 
-      VALUES (?, ?, datetime('now'))
-    `);
-    stmt.run(key, value);
-  },
-
-  // Get a specific setting or fallback
+  // ── SETTINGS (cache em memória para leitura síncrona) ─────
+  /**
+   * Leitura SÍNCRONA do cache de settings.
+   * O cache é populado no initDatabase() antes do servidor aceitar requisições.
+   */
   getSetting(key: string, defaultValue = ''): string {
-    const stmt = db.prepare('SELECT value FROM settings WHERE key = ?');
-    const row = stmt.get(key) as { value: string } | undefined;
-    return row ? row.value : defaultValue;
+    return settingsCache.get(key) ?? defaultValue;
   },
 
-  // Add system log
-  addLog(level: 'info' | 'warn' | 'error' | 'success', message: string, details?: string) {
-    const stmt = db.prepare(`
-      INSERT INTO logs (level, message, details, timestamp)
-      VALUES (?, ?, ?, datetime('now', 'localtime'))
-    `);
-    stmt.run(level, message, details || null);
+  /**
+   * Escrita ASSÍNCRONA: persiste no PG e atualiza o cache local.
+   */
+  async setSetting(key: string, value: string): Promise<void> {
+    await pool.query(
+      `INSERT INTO settings (key, value, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [key, value]
+    );
+    settingsCache.set(key, value);
   },
 
-  // Get recent logs
-  getLogs(limit = 100): AutopilotLog[] {
-    const stmt = db.prepare(`
-      SELECT id, timestamp, level, message, details 
-      FROM logs 
-      ORDER BY id DESC 
-      LIMIT ?
-    `);
-    return stmt.all(limit) as AutopilotLog[];
+  // ── LOGS ──────────────────────────────────────────────────
+  async addLog(level: 'info' | 'warn' | 'error' | 'success', message: string, details?: string): Promise<void> {
+    try {
+      await pool.query(
+        'INSERT INTO logs (level, message, details, timestamp) VALUES ($1,$2,$3, NOW())',
+        [level, message, details ?? null]
+      );
+    } catch {
+      // Log de banco não pode derrubar o sistema
+      console.error(`[LOG FAIL] ${level}: ${message}`);
+    }
+  },
+
+  async getLogs(limit = 100): Promise<AutopilotLog[]> {
+    const result = await pool.query(
+      'SELECT id, timestamp, level, message, details FROM logs ORDER BY id DESC LIMIT $1',
+      [limit]
+    );
+    return result.rows as AutopilotLog[];
+  },
+
+  // ── HELPER INTERNO ────────────────────────────────────────
+  _mapChannel(r: any): ChannelConfig {
+    return {
+      id: r.id,
+      name: r.name,
+      platform: r.platform,
+      chatId: r.chat_id,
+      category: r.category,
+      keywords: r.keywords ? JSON.parse(r.keywords) : [],
+      minDiscountPercent: parseFloat(r.min_discount),
+      minPrice: parseFloat(r.min_price),
+      isActive: r.is_active === 1 || r.is_active === true,
+      customBotToken: r.custom_bot_token || undefined,
+      createdAt: r.created_at
+    };
   }
 };
-
-// Initialize DB schema on module load
-initDatabase();

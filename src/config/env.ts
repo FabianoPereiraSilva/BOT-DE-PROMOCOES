@@ -5,6 +5,10 @@ import { SystemSettings } from '../types/deal.js';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
+/**
+ * Lê as configurações do sistema a partir do cache em memória (síncrono).
+ * O cache é populado pelo initDatabase() antes do servidor iniciar.
+ */
 export function getSystemSettings(): SystemSettings {
   const rawKeywords = dbService.getSetting('defaultKeywords', process.env.DEFAULT_KEYWORDS || '');
   let defaultKeywords: string[] = [];
@@ -34,23 +38,29 @@ export function getSystemSettings(): SystemSettings {
   };
 }
 
-export function updateSystemSettings(settings: Partial<SystemSettings>): SystemSettings {
-  if (settings.telegramBotToken !== undefined) dbService.setSetting('telegramBotToken', settings.telegramBotToken);
-  if (settings.telegramChatId !== undefined) dbService.setSetting('telegramChatId', settings.telegramChatId);
-  if (settings.mercadolivreAffiliateTag !== undefined) dbService.setSetting('mercadolivreAffiliateTag', settings.mercadolivreAffiliateTag);
-  if (settings.shopeeAppId !== undefined) dbService.setSetting('shopeeAppId', settings.shopeeAppId);
-  if (settings.shopeeSecret !== undefined) dbService.setSetting('shopeeSecret', settings.shopeeSecret);
-  if (settings.shopeeUniversalLinkPrefix !== undefined) dbService.setSetting('shopeeUniversalLinkPrefix', settings.shopeeUniversalLinkPrefix);
-  if (settings.autopilotEnabled !== undefined) dbService.setSetting('autopilotEnabled', settings.autopilotEnabled ? 'true' : 'false');
-  if (settings.autopilotIntervalMinutes !== undefined) dbService.setSetting('autopilotIntervalMinutes', settings.autopilotIntervalMinutes.toString());
-  if (settings.minDiscountPercent !== undefined) dbService.setSetting('minDiscountPercent', settings.minDiscountPercent.toString());
-  if (settings.minPrice !== undefined) dbService.setSetting('minPrice', settings.minPrice.toString());
-  if (settings.deduplicationHours !== undefined) dbService.setSetting('deduplicationHours', settings.deduplicationHours.toString());
-  if (settings.defaultCategory !== undefined) dbService.setSetting('defaultCategory', settings.defaultCategory);
-  if (settings.defaultKeywords !== undefined) {
-    dbService.setSetting('defaultKeywords', JSON.stringify(settings.defaultKeywords));
-  }
-  if (settings.customCopyTemplate !== undefined) dbService.setSetting('customCopyTemplate', settings.customCopyTemplate);
+/**
+ * Persiste as configurações no PostgreSQL (async) e atualiza o cache.
+ */
+export async function updateSystemSettings(settings: Partial<SystemSettings>): Promise<SystemSettings> {
+  const ops: Promise<void>[] = [];
+
+  if (settings.telegramBotToken !== undefined) ops.push(dbService.setSetting('telegramBotToken', settings.telegramBotToken));
+  if (settings.telegramChatId !== undefined) ops.push(dbService.setSetting('telegramChatId', settings.telegramChatId));
+  if (settings.mercadolivreAffiliateTag !== undefined) ops.push(dbService.setSetting('mercadolivreAffiliateTag', settings.mercadolivreAffiliateTag));
+  if (settings.shopeeAppId !== undefined) ops.push(dbService.setSetting('shopeeAppId', settings.shopeeAppId));
+  if (settings.shopeeSecret !== undefined) ops.push(dbService.setSetting('shopeeSecret', settings.shopeeSecret));
+  if (settings.shopeeUniversalLinkPrefix !== undefined) ops.push(dbService.setSetting('shopeeUniversalLinkPrefix', settings.shopeeUniversalLinkPrefix));
+  if (settings.autopilotEnabled !== undefined) ops.push(dbService.setSetting('autopilotEnabled', settings.autopilotEnabled ? 'true' : 'false'));
+  if (settings.autopilotIntervalMinutes !== undefined) ops.push(dbService.setSetting('autopilotIntervalMinutes', settings.autopilotIntervalMinutes.toString()));
+  if (settings.minDiscountPercent !== undefined) ops.push(dbService.setSetting('minDiscountPercent', settings.minDiscountPercent.toString()));
+  if (settings.minPrice !== undefined) ops.push(dbService.setSetting('minPrice', settings.minPrice.toString()));
+  if (settings.deduplicationHours !== undefined) ops.push(dbService.setSetting('deduplicationHours', settings.deduplicationHours.toString()));
+  if (settings.defaultCategory !== undefined) ops.push(dbService.setSetting('defaultCategory', settings.defaultCategory));
+  if (settings.defaultKeywords !== undefined) ops.push(dbService.setSetting('defaultKeywords', JSON.stringify(settings.defaultKeywords)));
+  if (settings.customCopyTemplate !== undefined) ops.push(dbService.setSetting('customCopyTemplate', settings.customCopyTemplate));
+
+  // Persiste todas as settings em paralelo
+  await Promise.all(ops);
 
   return getSystemSettings();
 }

@@ -78,7 +78,7 @@ export class AutopilotEngine {
     this.lastRunTime = new Date().toLocaleTimeString('pt-BR');
 
     const settings = getSystemSettings();
-    const activeChannels = dbService.getActiveChannels();
+    const activeChannels = await dbService.getActiveChannels();
 
     // Se não há canais específicos cadastrados, usa o canal padrão com o nicho configurado
     const channelsToProcess: ChannelConfig[] = activeChannels.length > 0 ? activeChannels : (
@@ -98,18 +98,18 @@ export class AutopilotEngine {
     if (channelsToProcess.length === 0) {
       this.isRunning = false;
       const msg = 'Nenhum canal ou grupo ativo configurado. Adicione um canal no Painel Web para iniciar a publicação.';
-      dbService.addLog('warn', msg);
+      await dbService.addLog('warn', msg);
       return { success: false, dealsFound: 0, dealsPosted: 0, message: msg };
     }
 
-    dbService.addLog('info', `Iniciando varredura para ${channelsToProcess.length} canal(is) configurado(s)...`);
+    await dbService.addLog('info', `Iniciando varredura para ${channelsToProcess.length} canal(is) configurado(s)...`);
 
     let totalDealsFound = 0;
     let totalDealsPosted = 0;
 
     try {
       for (const channel of channelsToProcess) {
-        dbService.addLog('info', `Buscando ofertas para o canal: "${channel.name}" (Nicho: ${channel.category})...`);
+        await dbService.addLog('info', `Buscando ofertas para o canal: "${channel.name}" (Nicho: ${channel.category})...`);
 
         const minDisc = channel.minDiscountPercent || settings.minDiscountPercent;
         const minP = channel.minPrice || settings.minPrice;
@@ -129,11 +129,21 @@ export class AutopilotEngine {
         // Ordena por maior desconto
         channelDeals.sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
 
-        // Filtra estritamente ofertas não duplicadas (verifica ID, URL e título similar nos últimos dias)
-        const freshDeals = channelDeals.filter(d => !dbService.isDealAlreadyPosted(d, channel.id, settings.deduplicationHours || 72));
+        // Deduplicação: pré-busca hashes dos posts recentes no banco
+        const hoursThreshold = settings.deduplicationHours || 72;
+        const recentHashes = await dbService.getRecentPostedHashes(hoursThreshold);
+
+        const freshDeals = channelDeals.filter(deal => {
+          if (recentHashes.has(`id:${deal.id}`)) return false;
+          const cleanUrl = (deal.originalUrl || '').split('?')[0].split('#')[0];
+          if (cleanUrl.length > 10 && recentHashes.has(`url:${cleanUrl}`)) return false;
+          const normTitle = deal.title.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 5).join(' ');
+          if (normTitle.length > 5 && recentHashes.has(`title:${normTitle}`)) return false;
+          return true;
+        });
 
         if (freshDeals.length === 0) {
-          dbService.addLog('info', `[${channel.name}] Todas as ofertas caçadas já foram postadas recentemente (Deduplicação rigorosa ativa).`);
+          await dbService.addLog('info', `[${channel.name}] Todas as ofertas caçadas já foram postadas recentemente (Deduplicação rigorosa ativa).`);
           continue;
         }
 
@@ -148,7 +158,7 @@ export class AutopilotEngine {
         );
 
         if (pubResult.success) {
-          dbService.recordPostedDeal({
+          await dbService.recordPostedDeal({
             id: dealToPost.id,
             channelId: channel.id,
             category: channel.category,
@@ -170,7 +180,7 @@ export class AutopilotEngine {
       }
 
       const summaryMsg = `Ciclo finalizado: ${totalDealsFound} ofertas analisadas em ${channelsToProcess.length} canais, ${totalDealsPosted} postadas com sucesso.`;
-      dbService.addLog('success', summaryMsg);
+      await dbService.addLog('success', summaryMsg);
 
       this.isRunning = false;
       return {
@@ -181,7 +191,7 @@ export class AutopilotEngine {
       };
     } catch (err: any) {
       this.isRunning = false;
-      dbService.addLog('error', 'Erro durante o ciclo de varredura por canais', err.message);
+      await dbService.addLog('error', 'Erro durante o ciclo de varredura por canais', err.message);
       return {
         success: false,
         dealsFound: 0,

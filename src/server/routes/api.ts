@@ -14,23 +14,29 @@ import crypto from 'crypto';
 export const apiRouter = Router();
 
 // 1. Status Geral do Sistema & Estatísticas
-apiRouter.get('/status', (req: Request, res: Response) => {
-  const stats = dbService.getStats();
-  const autopilot = AutopilotEngine.getStatus();
-  const settings = getSystemSettings();
-  const channels = dbService.getChannels();
+apiRouter.get('/status', async (req: Request, res: Response) => {
+  try {
+    const [stats, channels] = await Promise.all([
+      dbService.getStats(),
+      dbService.getChannels()
+    ]);
+    const autopilot = AutopilotEngine.getStatus();
+    const settings = getSystemSettings();
 
-  res.json({
-    success: true,
-    stats,
-    autopilot,
-    configured: {
-      telegram: !!(settings.telegramBotToken && (settings.telegramChatId || channels.length > 0)),
-      mercadolivreTag: !!settings.mercadolivreAffiliateTag,
-      shopeeAppId: !!settings.shopeeAppId,
-      channelsCount: channels.length
-    }
-  });
+    res.json({
+      success: true,
+      stats,
+      autopilot,
+      configured: {
+        telegram: !!(settings.telegramBotToken && (settings.telegramChatId || channels.length > 0)),
+        mercadolivreTag: !!settings.mercadolivreAffiliateTag,
+        shopeeAppId: !!settings.shopeeAppId,
+        channelsCount: channels.length
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // 2. Presets de Categorias & Nichos
@@ -42,12 +48,16 @@ apiRouter.get('/categories', (req: Request, res: Response) => {
 });
 
 // 3. Canais & Grupos CRUD
-apiRouter.get('/channels', (req: Request, res: Response) => {
-  const channels = dbService.getChannels();
-  res.json({ success: true, channels });
+apiRouter.get('/channels', async (req: Request, res: Response) => {
+  try {
+    const channels = await dbService.getChannels();
+    res.json({ success: true, channels });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-apiRouter.post('/channels', (req: Request, res: Response) => {
+apiRouter.post('/channels', async (req: Request, res: Response) => {
   const { id, name, platform, chatId, category, keywords, minDiscountPercent, minPrice, isActive, customBotToken } = req.body;
 
   if (!name || !chatId) {
@@ -69,23 +79,34 @@ apiRouter.post('/channels', (req: Request, res: Response) => {
     customBotToken: customBotToken ? customBotToken.trim() : undefined
   };
 
-  dbService.saveChannel(channel);
-  res.json({ success: true, channel });
+  try {
+    await dbService.saveChannel(channel);
+    res.json({ success: true, channel });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
-apiRouter.delete('/channels/:id', (req: Request, res: Response) => {
-  dbService.deleteChannel(req.params.id);
-  res.json({ success: true });
+apiRouter.delete('/channels/:id', async (req: Request, res: Response) => {
+  try {
+    await dbService.deleteChannel(req.params.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 apiRouter.post('/channels/:id/test', async (req: Request, res: Response) => {
-  const channel = dbService.getChannelById(req.params.id);
-  if (!channel) {
-    return res.status(404).json({ success: false, error: 'Canal não encontrado.' });
+  try {
+    const channel = await dbService.getChannelById(req.params.id);
+    if (!channel) {
+      return res.status(404).json({ success: false, error: 'Canal não encontrado.' });
+    }
+    const result = await TelegramPublisher.testConnection(channel.customBotToken, channel.chatId);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
   }
-
-  const result = await TelegramPublisher.testConnection(channel.customBotToken, channel.chatId);
-  res.json(result);
 });
 
 // 4. Obter Configurações Gerais
@@ -101,24 +122,28 @@ apiRouter.get('/settings', (req: Request, res: Response) => {
 });
 
 // 5. Atualizar Configurações Gerais
-apiRouter.post('/settings', (req: Request, res: Response) => {
-  const payload = req.body;
-  
-  if (payload.telegramBotToken && payload.telegramBotToken.includes('...')) {
-    delete payload.telegramBotToken;
-  }
+apiRouter.post('/settings', async (req: Request, res: Response) => {
+  try {
+    const payload = req.body;
 
-  const updated = updateSystemSettings(payload);
-
-  if (payload.autopilotEnabled !== undefined) {
-    if (payload.autopilotEnabled) {
-      AutopilotEngine.start();
-    } else {
-      AutopilotEngine.stop();
+    if (payload.telegramBotToken && payload.telegramBotToken.includes('...')) {
+      delete payload.telegramBotToken;
     }
-  }
 
-  res.json({ success: true, settings: updated });
+    const updated = await updateSystemSettings(payload);
+
+    if (payload.autopilotEnabled !== undefined) {
+      if (payload.autopilotEnabled) {
+        AutopilotEngine.start();
+      } else {
+        AutopilotEngine.stop();
+      }
+    }
+
+    res.json({ success: true, settings: updated });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // 6. Testar Conexão com Telegram
@@ -200,7 +225,7 @@ apiRouter.post('/quick-post/publish', async (req: Request, res: Response) => {
 
     // Resolução do canal de destino
     if (channelId && channelId !== 'default' && channelId !== 'all') {
-      const channel = dbService.getChannelById(channelId);
+      const channel = await dbService.getChannelById(channelId);
       if (channel) {
         targetChat = channel.chatId;
         customToken = channel.customBotToken;
@@ -209,7 +234,7 @@ apiRouter.post('/quick-post/publish', async (req: Request, res: Response) => {
 
     // Se ainda não tem targetChat, usa o chat principal ou o primeiro canal ativo
     if (!targetChat) {
-      const activeChannels = dbService.getActiveChannels();
+      const activeChannels = await dbService.getActiveChannels();
       targetChat = settings.telegramChatId || (activeChannels.length > 0 ? activeChannels[0].chatId : undefined);
     }
 
@@ -223,7 +248,7 @@ apiRouter.post('/quick-post/publish', async (req: Request, res: Response) => {
     const result = await TelegramPublisher.publishDeal(dealData, undefined, targetChat, customToken);
 
     if (result.success) {
-      dbService.recordPostedDeal({
+      await dbService.recordPostedDeal({
         id: dealData.id,
         channelId: channelId || 'manual',
         category: dealData.category || 'geral',
@@ -282,15 +307,23 @@ apiRouter.post('/autopilot/trigger', async (req: Request, res: Response) => {
 });
 
 // 12. Histórico de Ofertas Postadas
-apiRouter.get('/deals/recent', (req: Request, res: Response) => {
-  const limit = parseInt(req.query.limit as string, 10) || 50;
-  const deals = dbService.getRecentPostedDeals(limit);
-  res.json({ success: true, deals });
+apiRouter.get('/deals/recent', async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string, 10) || 50;
+    const deals = await dbService.getRecentPostedDeals(limit);
+    res.json({ success: true, deals });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // 13. Logs do Sistema em Tempo Real
-apiRouter.get('/logs', (req: Request, res: Response) => {
-  const limit = parseInt(req.query.limit as string, 10) || 100;
-  const logs = dbService.getLogs(limit);
-  res.json({ success: true, logs });
+apiRouter.get('/logs', async (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string, 10) || 100;
+    const logs = await dbService.getLogs(limit);
+    res.json({ success: true, logs });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
