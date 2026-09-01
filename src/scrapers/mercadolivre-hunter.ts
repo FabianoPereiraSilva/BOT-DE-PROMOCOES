@@ -7,6 +7,34 @@ import { CATEGORY_PRESETS } from '../config/categories.js';
 
 export class MercadoLivreHunter {
   /**
+   * Extrai com precisão o valor numérico de um elemento de preço andes-money-amount (lendo aria-label, fração e centavos)
+   */
+  static extractPriceFromElement($: cheerio.CheerioAPI, elem: cheerio.Cheerio<any>): number | undefined {
+    if (!elem || elem.length === 0) return undefined;
+
+    // 1. Tenta extrair pelo aria-label (ex: "Antes: 239 reais com 90 centavos" ou "58 reais com 90 centavos")
+    const ariaLabel = elem.attr('aria-label') || '';
+    if (ariaLabel) {
+      const reaisMatch = ariaLabel.match(/(\d+)\s*reais/i);
+      const centavosMatch = ariaLabel.match(/(\d+)\s*centavos/i);
+      if (reaisMatch) {
+        const reais = reaisMatch[1];
+        const centavos = centavosMatch ? centavosMatch[1] : '00';
+        return cleanPrice(`${reais}.${centavos}`);
+      }
+    }
+
+    // 2. Extrai fração + centavos pelos spans filhos
+    const fraction = elem.find('.andes-money-amount__fraction').first().text().trim();
+    const cents = elem.find('.andes-money-amount__cents').first().text().trim() || '00';
+    if (fraction) {
+      return cleanPrice(`${fraction}.${cents}`);
+    }
+
+    return undefined;
+  }
+
+  /**
    * Extrai dados de um produto individual do Mercado Livre via URL
    */
   static async extractProductFromUrl(productUrl: string): Promise<Deal | null> {
@@ -29,24 +57,18 @@ export class MercadoLivreHunter {
       });
 
       // Título
-      let title = ldJsonData?.name ||
-                  $('h1.ui-pdp-title').text().trim() ||
-                  $('meta[property="og:title"]').attr('content')?.replace(/ \| Mercado\s*Livre/i, '').trim() ||
-                  $('meta[name="twitter:title"]').attr('content')?.replace(/ \| Mercado\s*Livre/i, '').trim() ||
-                  $('title').text().replace(/ \| Mercado\s*Livre/i, '').trim();
-
-      if (title && (title.toLowerCase() === 'mercado libre' || title.toLowerCase() === 'mercado livre')) {
-        const h1 = $('h1').first().text().trim();
-        if (h1) title = h1;
-      }
+      const title = ldJsonData?.name ||
+                    $('h1.ui-pdp-title').text().trim() ||
+                    $('meta[property="og:title"]').attr('content')?.replace(/ \| Mercado\s*Livre/i, '').trim() ||
+                    $('meta[name="twitter:title"]').attr('content')?.replace(/ \| Mercado\s*Livre/i, '').trim() ||
+                    $('title').text().replace(/ \| Mercado\s*Livre/i, '').trim();
 
       if (!title || title.toLowerCase() === 'mercado libre' || title.toLowerCase() === 'mercado livre') {
         return null;
       }
 
       // Imagem
-      let imageUrl = ldJsonData?.image ||
-                     $('figure.ui-pdp-gallery__figure img').first().attr('src') ||
+      let imageUrl = $('meta[property="og:image:secure_url"]').attr('content') ||
                      $('meta[property="og:image"]').attr('content') ||
                      $('meta[name="twitter:image"]').attr('content') ||
                      $('.ui-pdp-image').first().attr('src') || '';
@@ -60,38 +82,32 @@ export class MercadoLivreHunter {
       }
 
       // Preço atual
-      let currentPrice = cleanPrice(ldJsonData?.offers?.price || ldJsonData?.offers?.lowPrice);
-      
+      let currentPrice: number | undefined;
+
+      // 1. Tenta pegar do elemento visual principal do preço (segunda linha ou preço primário)
+      const currentElem = $('.ui-pdp-price__second-line .andes-money-amount, .andes-money-amount--primary, .ui-pdp-price .andes-money-amount').first();
+      currentPrice = this.extractPriceFromElement($, currentElem);
+
       if (!currentPrice) {
         const priceMeta = $('meta[itemprop="price"]').attr('content') ||
                           $('meta[property="product:price:amount"]').attr('content');
         currentPrice = cleanPrice(priceMeta);
       }
 
-      if (!currentPrice) {
-        const fraction = $('.ui-pdp-price__second-line .andes-money-amount__fraction, .andes-money-amount--primary .andes-money-amount__fraction').first().text().trim();
-        const cents = $('.ui-pdp-price__second-line .andes-money-amount__cents, .andes-money-amount--primary .andes-money-amount__cents').first().text().trim() || '00';
-        if (fraction) {
-          currentPrice = cleanPrice(`${fraction}.${cents}`);
-        }
-      }
-
-      // Preço original (riscado)
+      // Preço original (riscado / antes)
       let originalPrice: number | undefined;
-      const originalFraction = $('.ui-pdp-price__original-value .andes-money-amount__fraction, .andes-money-amount--previous .andes-money-amount__fraction').first().text().trim();
-      if (originalFraction) {
-        originalPrice = cleanPrice(originalFraction);
-      }
+      const originalElem = $('.ui-pdp-price__original-value .andes-money-amount, .andes-money-amount--previous, s.andes-money-amount').first();
+      originalPrice = this.extractPriceFromElement($, originalElem);
 
       // Desconto percentual
       let discountPercent: number | undefined;
-      const discountText = $('.ui-pdp-price__second-line .andes-money-amount__discount, .andes-money-amount__discount').first().text().trim();
+      const discountText = $('.ui-pdp-price__second-line .andes-money-amount__discount, .andes-money-amount__discount, .ui-pdp-price__discount').first().text().trim();
       if (discountText) {
         const match = discountText.match(/(\d+)%/);
         if (match) discountPercent = parseInt(match[1], 10);
       }
 
-      if (!discountPercent && originalPrice && originalPrice > currentPrice) {
+      if (!discountPercent && originalPrice && currentPrice && originalPrice > currentPrice) {
         discountPercent = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
       }
 
@@ -218,18 +234,18 @@ export class MercadoLivreHunter {
               if (!isRelevant) return;
             }
 
-            // Preço atual
-            const currentFraction = card.find('.poly-price__current .andes-money-amount__fraction, .promotion-item__price .andes-money-amount__fraction, .ui-search-price__second-line .andes-money-amount__fraction, .andes-money-amount__fraction').first().text().trim();
-            const currentCents = card.find('.poly-price__current .andes-money-amount__cents, .promotion-item__price .andes-money-amount__cents, .ui-search-price__second-line .andes-money-amount__cents, .andes-money-amount__cents').first().text().trim() || '00';
-            const currentPrice = cleanPrice(`${currentFraction}.${currentCents}`);
+            // Preço atual (prioriza o preço principal fora do buy-box alternativo)
+            const currentPriceElem = card.find('.poly-component__price > .poly-price__current .andes-money-amount, .poly-price__current .andes-money-amount, .promotion-item__price .andes-money-amount, .ui-search-price__second-line .andes-money-amount, .andes-money-amount').first();
+            const currentPrice = this.extractPriceFromElement($, currentPriceElem);
 
-            if (currentPrice < minPrice) return;
+            if (!currentPrice || currentPrice < minPrice) return;
 
-            // Preço anterior / Desconto
-            const originalFraction = card.find('.andes-money-amount--previous .andes-money-amount__fraction, .promotion-item__old-price .andes-money-amount__fraction').first().text().trim();
-            const originalPrice = originalFraction ? cleanPrice(originalFraction) : undefined;
+            // Preço original (riscado / antes)
+            const originalPriceElem = card.find('.poly-component__price .andes-money-amount--previous, .andes-money-amount--previous, .promotion-item__old-price .andes-money-amount, .ui-search-price__original-value .andes-money-amount, s.andes-money-amount').first();
+            const originalPrice = this.extractPriceFromElement($, originalPriceElem);
 
-            const discountText = card.find('.andes-money-amount__discount, .promotion-item__discount, .ui-search-price__discount').first().text().trim();
+            // Desconto percentual
+            const discountText = card.find('.poly-price__discount-polylabel, .andes-money-amount__discount, .promotion-item__discount, .ui-search-price__discount').first().text().trim();
             let discountPercent: number | undefined;
             if (discountText) {
               const match = discountText.match(/(\d+)%/);
