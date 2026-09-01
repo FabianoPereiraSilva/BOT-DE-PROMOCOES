@@ -137,13 +137,17 @@ export class ShopeeHunter {
     minDiscount = 20, 
     minPrice = 15, 
     categoryKey = 'geral', 
-    customKeywords: string[] = []
+    customKeywords: string[] = [],
+    searchQuery?: string
   ): Promise<Deal[]> {
     const deals: Deal[] = [];
     const preset = CATEGORY_PRESETS[categoryKey];
 
     let searchKeywords = ['promocao relampago', 'ofertas do dia', 'desconto'];
-    if (preset && categoryKey !== 'geral') {
+
+    if (searchQuery && searchQuery.trim().length > 0) {
+      searchKeywords = [searchQuery.trim()];
+    } else if (preset && categoryKey !== 'geral') {
       searchKeywords = customKeywords.length > 0 ? customKeywords : preset.defaultKeywords;
     }
 

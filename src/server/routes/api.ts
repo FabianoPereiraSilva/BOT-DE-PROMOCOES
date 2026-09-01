@@ -254,7 +254,7 @@ apiRouter.get('/deals/hunter-preview', async (req: Request, res: Response) => {
   try {
     const [mlDeals, shopeeDeals] = await Promise.allSettled([
       MercadoLivreHunter.huntDeals(settings.minDiscountPercent, settings.minPrice, category, [], query),
-      ShopeeHunter.huntDeals(settings.minDiscountPercent, settings.minPrice, category)
+      ShopeeHunter.huntDeals(settings.minDiscountPercent, settings.minPrice, category, [], query)
     ]);
 
     const deals: Deal[] = [];

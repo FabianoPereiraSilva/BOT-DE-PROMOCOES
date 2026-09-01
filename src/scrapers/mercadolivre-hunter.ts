@@ -135,11 +135,11 @@ export class MercadoLivreHunter {
     const deals: Deal[] = [];
     const targetUrls: string[] = [];
 
-    // Se houver busca direta por marca/termo (ex: "Nike", "Apple", "Growth")
+    // Se houver busca direta por marca/termo (ex: "Nike", "Apple", "Growth", "Stanley")
     if (searchQuery && searchQuery.trim().length > 0) {
-      const formatted = encodeURIComponent(searchQuery.trim().replace(/\s+/g, '-'));
-      targetUrls.push(`https://lista.mercadolivre.com.br/${formatted}_Desconto_${minDiscount}-100`);
-      targetUrls.push(`https://lista.mercadolivre.com.br/${formatted}`);
+      const q = encodeURIComponent(searchQuery.trim());
+      targetUrls.push(`https://www.mercadolivre.com.br/ofertas?q=${q}`);
+      targetUrls.push(`https://www.mercadolivre.com.br/ofertas?promotion_type=deal_of_the_day&q=${q}`);
     } else {
       const preset = CATEGORY_PRESETS[categoryKey];
 
@@ -151,8 +151,8 @@ export class MercadoLivreHunter {
         const keywords = customKeywords.length > 0 ? customKeywords : preset.defaultKeywords;
         
         for (const kw of keywords.slice(0, 3)) {
-          const formattedKw = encodeURIComponent(kw.replace(/\s+/g, '-'));
-          targetUrls.push(`https://lista.mercadolivre.com.br/${formattedKw}_Desconto_${minDiscount}-100`);
+          const formattedKw = encodeURIComponent(kw);
+          targetUrls.push(`https://www.mercadolivre.com.br/ofertas?q=${formattedKw}`);
         }
 
         if (preset.mlCategoryId) {
