@@ -34,4 +34,4 @@ RUN npm run build
 EXPOSE 3000
 
 # Inicia o servidor
-CMD ["node", "dist/server/app.js"]
+CMD ["node", "--dns-result-order=ipv4first", "dist/server/app.js"]

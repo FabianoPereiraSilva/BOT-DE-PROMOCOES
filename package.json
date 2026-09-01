@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/server/app.ts",
     "build": "tsc",
-    "start": "node dist/server/app.js",
+    "start": "node --dns-result-order=ipv4first dist/server/app.js",
     "test:hunter": "tsx src/test-hunter.ts",
     "test:banner": "tsx src/test-banner.ts",
     "test:telegram": "tsx src/test-telegram.ts"
