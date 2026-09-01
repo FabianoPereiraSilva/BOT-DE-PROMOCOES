@@ -1,0 +1,73 @@
+export type StoreSource = 'shopee' | 'mercadolivre';
+
+export interface Deal {
+  id: string; // unique hash or store product ID
+  store: StoreSource;
+  title: string;
+  originalPrice?: number;
+  currentPrice: number;
+  discountPercent?: number;
+  imageUrl: string;
+  originalUrl: string;
+  affiliateUrl: string;
+  rating?: number;
+  reviewCount?: number;
+  freeShipping?: boolean;
+  couponCode?: string;
+  installments?: string;
+  category?: string;
+  postedAt?: string;
+}
+
+export interface PostedDealRecord {
+  id: string;
+  store: string;
+  title: string;
+  original_price: number | null;
+  current_price: number;
+  discount_percent: number | null;
+  image_url: string;
+  original_url: string;
+  affiliate_url: string;
+  telegram_message_id: string | null;
+  channel_id?: string | null;
+  category?: string | null;
+  posted_at: string;
+}
+
+export interface ChannelConfig {
+  id: string;
+  name: string;
+  platform: 'telegram' | 'whatsapp' | 'instagram';
+  chatId: string;
+  category: string; // key from categories.ts (ex: esportes_suplementos, eletronicos_tech, geral)
+  keywords?: string[];
+  minDiscountPercent: number;
+  minPrice: number;
+  isActive: boolean;
+  customBotToken?: string;
+  createdAt?: string;
+}
+
+export interface SystemSettings {
+  telegramBotToken: string;
+  telegramChatId: string;
+  mercadolivreAffiliateTag: string;
+  shopeeAppId: string;
+  shopeeSecret: string;
+  shopeeUniversalLinkPrefix: string;
+  autopilotEnabled: boolean;
+  autopilotIntervalMinutes: number;
+  minDiscountPercent: number;
+  minPrice: number;
+  deduplicationHours: number;
+  customCopyTemplate?: string;
+}
+
+export interface AutopilotLog {
+  id?: number;
+  timestamp: string;
+  level: 'info' | 'warn' | 'error' | 'success';
+  message: string;
+  details?: string;
+}

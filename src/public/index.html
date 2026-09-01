@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromoBot Pro | Shopee & Mercado Livre -> Telegram Multi-Canais</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header & Navigation -->
+    <header class="app-header">
+      <div class="brand-section">
+        <div class="logo-icon">
+          <span>⚡</span>
+        </div>
+        <div class="brand-text">
+          <h1>PromoBot <span>Pro</span></h1>
+          <p class="brand-sub">Shopee & Mercado Livre ➔ Telegram Multi-Nichos 24/7</p>
+        </div>
+      </div>
+
+      <nav class="nav-tabs">
+        <button class="nav-btn active" data-tab="quick-post" id="nav-quick-post">
+          <span class="icon">✨</span> Postagem Rápida
+        </button>
+        <button class="nav-btn" data-tab="channels" id="nav-channels">
+          <span class="icon">📢</span> Canais & Nichos
+        </button>
+        <button class="nav-btn" data-tab="hunter" id="nav-hunter">
+          <span class="icon">🎯</span> Radar de Ofertas
+        </button>
+        <button class="nav-btn" data-tab="history" id="nav-history">
+          <span class="icon">📜</span> Histórico
+        </button>
+        <button class="nav-btn" data-tab="settings" id="nav-settings">
+          <span class="icon">⚙️</span> Configurações
+        </button>
+        <button class="nav-btn" data-tab="logs" id="nav-logs">
+          <span class="icon">📋</span> Logs
+        </button>
+      </nav>
+
+      <div class="header-status">
+        <div class="autopilot-pill" id="autopilot-status-pill">
+          <span class="pulse-dot"></span>
+          <span class="status-label">Piloto Automático: <b id="autopilot-text-status">Verificando...</b></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Metrics Bar -->
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon tg-gradient">📢</div>
+        <div class="stat-info">
+          <span class="stat-label">Canais Ativos</span>
+          <h2 class="stat-value" id="stat-channels">0</h2>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon today-gradient">🔥</div>
+        <div class="stat-info">
+          <span class="stat-label">Publicadas Hoje</span>
+          <h2 class="stat-value" id="stat-today">0</h2>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon shopee-gradient">🟠</div>
+        <div class="stat-info">
+          <span class="stat-label">Shopee</span>
+          <h2 class="stat-value" id="stat-shopee">0</h2>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon ml-gradient">🟡</div>
+        <div class="stat-info">
+          <span class="stat-label">Mercado Livre</span>
+          <h2 class="stat-value" id="stat-ml">0</h2>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 1: Postagem Rápida (Quick Post) -->
+    <main class="tab-content active" id="tab-quick-post">
+      <div class="quick-post-container">
+        <div class="glass-card input-hero-card">
+          <div class="card-header">
+            <h2>🚀 Postagem Rápida & Gerador de Banner</h2>
+            <p>Cole qualquer link de produto da Shopee ou Mercado Livre para converter o link de afiliado, gerar o banner e publicar no canal desejado.</p>
+          </div>
+
+          <form id="quick-post-form" class="url-input-group">
+            <div class="input-wrapper">
+              <span class="input-icon">🔗</span>
+              <input 
+                type="url" 
+                id="product-url-input" 
+                placeholder="Cole o link do produto aqui (ex: https://shopee.com.br/... ou https://produto.mercadolivre.com.br/...)" 
+                required
+              >
+            </div>
+            <button type="submit" class="btn-primary" id="btn-extract">
+              <span class="btn-text">Extrair Oferta & Gerar Arte</span>
+              <span class="btn-loader hidden"></span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Preview Area -->
+        <div class="preview-stage hidden" id="preview-stage">
+          <div class="preview-grid">
+            <!-- Left: Banner Card Preview -->
+            <div class="glass-card preview-card">
+              <div class="preview-card-header">
+                <h3>🖼️ Banner Promocional Gerado (1080x1080)</h3>
+                <span class="badge" id="preview-store-badge">SHOPEE</span>
+              </div>
+              <div class="banner-display-wrapper">
+                <img id="banner-preview-img" src="" alt="Banner da Promoção">
+                <div class="banner-loading hidden" id="banner-loading">
+                  <div class="spinner"></div>
+                  <span>Renderizando arte em alta resolução...</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Telegram Message & Edit Details -->
+            <div class="glass-card preview-card">
+              <div class="preview-card-header">
+                <h3>📱 Mensagem no Telegram</h3>
+                <span class="tag-status">Pronta para Disparo</span>
+              </div>
+
+              <div class="telegram-mock-window">
+                <div class="tg-message-bubble">
+                  <div class="tg-caption" id="tg-caption-preview"></div>
+                  <div class="tg-inline-button" id="tg-btn-preview">
+                    🔥 COMPRAR COM DESCONTO 🔥
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Controls -->
+              <div class="deal-edit-section">
+                <div class="form-row-2">
+                  <div class="form-group">
+                    <label>Preço Promocional (R$):</label>
+                    <input type="number" step="0.01" id="edit-current-price">
+                  </div>
+                  <div class="form-group">
+                    <label>Preço Original Riscado (R$):</label>
+                    <input type="number" step="0.01" id="edit-original-price">
+                  </div>
+                </div>
+                <div class="form-row-2">
+                  <div class="form-group">
+                    <label>Cupom de Desconto (Opcional):</label>
+                    <input type="text" id="edit-coupon-code" placeholder="Ex: PROMO10">
+                  </div>
+                  <div class="form-group">
+                    <label>Canal de Destino:</label>
+                    <select id="quick-post-channel-select" class="custom-select">
+                      <option value="default">Canal Principal (Configurações Gerais)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="action-buttons">
+                  <button type="button" class="btn-secondary" id="btn-re-render">
+                    🔄 Atualizar Banner
+                  </button>
+                  <button type="button" class="btn-success" id="btn-publish-now">
+                    📢 Publicar no Telegram Agora!
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- TAB 2: Canais & Nichos (Multi-Canais) -->
+    <main class="tab-content" id="tab-channels">
+      <div class="channels-container">
+        <div class="glass-card channels-header-card">
+          <div class="hunter-title-row">
+            <div>
+              <h2>📢 Gerenciador de Canais & Grupos por Nicho</h2>
+              <p>Cadastre canais específicos (ex: <b>Esportes & Suplementação</b>, <b>Eletrônicos</b>, <b>Casa & Cozinha</b>) para o robô postar automaticamente nos grupos certos.</p>
+            </div>
+            <button class="btn-primary" id="btn-open-add-channel-modal">
+              ➕ Cadastrar Novo Canal
+            </button>
+          </div>
+        </div>
+
+        <!-- Add Channel Form (Inline Box) -->
+        <div class="glass-card channel-form-card hidden" id="channel-form-box">
+          <div class="card-header">
+            <h3 id="channel-form-title">Cadastrar Novo Canal / Grupo</h3>
+            <p>Preencha os dados do canal do Telegram e o nicho de produtos desejado.</p>
+          </div>
+
+          <form id="channel-create-form" class="form-grid">
+            <input type="hidden" id="channel-form-id">
+
+            <div class="form-group">
+              <label for="channel-input-name">Nome do Canal / Grupo:</label>
+              <input type="text" id="channel-input-name" placeholder="Ex: Canal Suplementos & Esporte" required>
+            </div>
+
+            <div class="form-group">
+              <label for="channel-input-chatid">ID do Chat / Canal no Telegram:</label>
+              <input type="text" id="channel-input-chatid" placeholder="Ex: @promos_suplementos ou -1001234567890" required>
+              <small>⚠️ Adicione o seu Bot como <b>Administrador</b> do Canal/Grupo!</small>
+            </div>
+
+            <div class="form-group">
+              <label for="channel-input-category">Nicho / Categoria de Ofertas:</label>
+              <select id="channel-input-category" class="custom-select">
+                <option value="esportes_suplementos">💪 Esportes & Suplementação (Whey, Creatina, Tênis, etc.)</option>
+                <option value="eletronicos_tech">📱 Eletrônicos & Tecnologia (Smartphones, Fones, etc.)</option>
+                <option value="casa_cozinha">🍳 Casa, Cozinha & Eletrodomésticos (Air Fryer, Panelas, etc.)</option>
+                <option value="moda_beleza">💄 Beleza, Perfumaria & Moda (Perfumes, Skincare, etc.)</option>
+                <option value="games_informatica">🎮 Games & Computadores (Jogos, Controles, SSDs, etc.)</option>
+                <option value="geral">🔥 Geral (Melhores Ofertas de Todas as Categorias)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="channel-input-keywords">Palavras-chave Personalizadas (Separadas por vírgula):</label>
+              <input type="text" id="channel-input-keywords" placeholder="Ex: creatina, whey, pre treino, garrafa termica">
+              <small>Deixe em branco para usar as palavras-chave inteligentes padrão do nicho.</small>
+            </div>
+
+            <div class="form-group">
+              <label for="channel-input-min-discount">Desconto Mínimo para este canal (%):</label>
+              <input type="number" id="channel-input-min-discount" min="5" max="95" value="20">
+            </div>
+
+            <div class="form-group">
+              <label for="channel-input-token">Token de Bot Dedicado (Opcional):</label>
+              <input type="password" id="channel-input-token" placeholder="Deixe em branco para usar o Bot Geral">
+            </div>
+
+            <div class="form-group full-width" style="display: flex; gap: 14px; margin-top: 10px;">
+              <button type="submit" class="btn-success">
+                💾 Salvar Canal
+              </button>
+              <button type="button" class="btn-secondary" id="btn-cancel-channel-form">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Channels Grid -->
+        <div class="channels-grid" id="channels-list-grid">
+          <!-- Dynamically loaded channels -->
+        </div>
+      </div>
+    </main>
+
+    <!-- TAB 3: Radar de Ofertas ao Vivo (Hunter) -->
+    <main class="tab-content" id="tab-hunter">
+      <div class="hunter-container">
+        <div class="glass-card hunter-header-card">
+          <div class="hunter-title-row">
+            <div>
+              <h2>🎯 Radar de Ofertas em Tempo Real</h2>
+              <p>Ofertas com os maiores descontos garimpadas automaticamente na Shopee e Mercado Livre por nicho.</p>
+            </div>
+            <div class="hunter-actions">
+              <select id="hunter-category-filter" class="custom-select" style="min-width: 220px;">
+                <option value="geral">🔥 Todas as Categorias (Geral)</option>
+                <option value="esportes_suplementos">💪 Esportes & Suplementação</option>
+                <option value="eletronicos_tech">📱 Eletrônicos & Tecnologia</option>
+                <option value="casa_cozinha">🍳 Casa & Cozinha</option>
+                <option value="moda_beleza">💄 Beleza & Moda</option>
+                <option value="games_informatica">🎮 Games & Informática</option>
+              </select>
+              <button class="btn-secondary" id="btn-refresh-hunter">
+                🔍 Caçar Agora
+              </button>
+              <button class="btn-primary" id="btn-trigger-autopilot">
+                ⚡ Disparar Ciclo Autônomo
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="deals-grid" id="hunter-deals-grid">
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Buscando ofertas com alto desconto...</p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- TAB 4: Histórico de Envios -->
+    <main class="tab-content" id="tab-history">
+      <div class="history-container">
+        <div class="glass-card">
+          <div class="card-header">
+            <h2>📜 Histórico de Ofertas Publicadas</h2>
+            <p>Lista de produtos enviados para os canais do Telegram com proteção anti-duplicação.</p>
+          </div>
+
+          <div class="table-responsive">
+            <table class="deals-table">
+              <thead>
+                <tr>
+                  <th>Foto</th>
+                  <th>Loja</th>
+                  <th>Nicho / Canal</th>
+                  <th>Produto</th>
+                  <th>Preço De</th>
+                  <th>Preço Por</th>
+                  <th>Desconto</th>
+                  <th>Data/Hora</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="history-table-body">
+                <tr>
+                  <td colspan="9" class="text-center">Carregando histórico...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- TAB 5: Configurações & Conexões -->
+    <main class="tab-content" id="tab-settings">
+      <div class="settings-container">
+        <form id="settings-form">
+          <!-- Telegram Section -->
+          <div class="glass-card settings-section">
+            <div class="section-title">
+              <span class="section-badge tg-badge">1</span>
+              <div>
+                <h3>Bot Geral do Telegram</h3>
+                <p>Configure o bot principal do Telegram utilizado para publicação nos canais.</p>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group full-width">
+                <label for="setting-tg-token">Telegram Bot Token (obtido com o @BotFather):</label>
+                <div class="input-with-action">
+                  <input type="password" id="setting-tg-token" placeholder="Ex: 7123456789:AAHxyz..." autocomplete="off">
+                  <button type="button" class="btn-small" id="btn-toggle-token-visibility">👁️</button>
+                </div>
+                <small>Fale com o <b>@BotFather</b> no Telegram para criar um bot e copiar o Token.</small>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="setting-tg-chat">ID do Canal / Grupo Padrão (Opcional se usar canais por nicho):</label>
+                <input type="text" id="setting-tg-chat" placeholder="Ex: @meucanalpromocoes ou -1001234567890">
+              </div>
+
+              <div class="form-group full-width">
+                <button type="button" class="btn-secondary" id="btn-test-telegram">
+                  🧪 Testar Conexão do Bot Principal
+                </button>
+                <span id="test-tg-feedback" class="feedback-msg"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Piloto Automático 24/7 Section -->
+          <div class="glass-card settings-section">
+            <div class="section-title">
+              <span class="section-badge auto-badge">2</span>
+              <div>
+                <h3>Piloto Automático 24/7 (Zero Ação Manual)</h3>
+                <p>O motor varre as categorias de cada canal cadastrado e dispara as promoções sozinho.</p>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group full-width toggle-group">
+                <label class="switch-label">
+                  <span class="switch-title">Ativar Piloto Automático Multi-Canais 24/7:</span>
+                  <span class="switch-desc">O robô caça as melhores ofertas de cada nicho e publica automaticamente nos seus respectivos grupos/canais.</span>
+                </label>
+                <label class="switch">
+                  <input type="checkbox" id="setting-autopilot-enabled">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="form-group">
+                <label for="setting-autopilot-interval">Intervalo entre Varreduras (minutos):</label>
+                <input type="number" id="setting-autopilot-interval" min="5" max="1440" value="20">
+                <small>Tempo de espera entre cada ciclo de busca e publicação.</small>
+              </div>
+
+              <div class="form-group">
+                <label for="setting-min-discount">Desconto Mínimo Geral (%):</label>
+                <input type="number" id="setting-min-discount" min="5" max="95" value="25">
+              </div>
+
+              <div class="form-group">
+                <label for="setting-min-price">Preço Mínimo do Produto (R$):</label>
+                <input type="number" id="setting-min-price" min="1" step="0.5" value="15">
+              </div>
+
+              <div class="form-group">
+                <label for="setting-dedup-hours">Anti-Duplicação por Canal (horas):</label>
+                <input type="number" id="setting-dedup-hours" min="1" max="720" value="48">
+              </div>
+            </div>
+          </div>
+
+          <!-- Afiliados Section -->
+          <div class="glass-card settings-section">
+            <div class="section-title">
+              <span class="section-badge aff-badge">3</span>
+              <div>
+                <h3>Seus Links & Credenciais de Afiliados</h3>
+                <p>Insira suas tags de afiliado da Shopee e do Mercado Livre para monetizar todos os links.</p>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group full-width">
+                <label for="setting-ml-tag">Tag de Afiliado Mercado Livre (matt_tool ou código):</label>
+                <input type="text" id="setting-ml-tag" placeholder="Ex: matt_tool=12345678&matt_word=promo">
+                <small>Insira seu código de afiliado do Mercado Livre para ser anexado automaticamente.</small>
+              </div>
+
+              <div class="form-group">
+                <label for="setting-shopee-appid">Shopee App ID (Opcional - Open API):</label>
+                <input type="text" id="setting-shopee-appid" placeholder="Ex: 12345678">
+              </div>
+
+              <div class="form-group">
+                <label for="setting-shopee-secret">Shopee Secret (Opcional - Open API):</label>
+                <input type="password" id="setting-shopee-secret" placeholder="••••••••••••">
+              </div>
+            </div>
+          </div>
+
+          <!-- Save Button -->
+          <div class="settings-actions">
+            <button type="submit" class="btn-success btn-large" id="btn-save-settings">
+              💾 Salvar Todas as Configurações
+            </button>
+            <span id="save-feedback" class="feedback-msg"></span>
+          </div>
+        </form>
+      </div>
+    </main>
+
+    <!-- TAB 6: Logs do Sistema -->
+    <main class="tab-content" id="tab-logs">
+      <div class="logs-container">
+        <div class="glass-card">
+          <div class="logs-header">
+            <div>
+              <h2>📋 Logs de Atividade em Tempo Real</h2>
+              <p>Histórico detalhado de varreduras multi-canais, publicações e eventos do robô.</p>
+            </div>
+            <button class="btn-secondary btn-small" id="btn-refresh-logs">
+              🔄 Atualizar Logs
+            </button>
+          </div>
+
+          <div class="terminal-window" id="terminal-logs">
+            <div class="log-line info">[Inicializando console de logs...]</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
