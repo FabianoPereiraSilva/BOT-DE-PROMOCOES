@@ -90,7 +90,6 @@ export class BannerGenerator {
       const rawImgBuffer = await this.downloadImage(deal.imageUrl);
       if (rawImgBuffer) {
         try {
-          // Normaliza e redimensiona a imagem do produto em alta qualidade com fundo branco
           const processedImg = await sharp(rawImgBuffer)
             .resize(680, 520, {
               fit: 'contain',
@@ -106,7 +105,9 @@ export class BannerGenerator {
       }
     }
 
-    // Monta o SVG vetorial completo com o produto embutido na ordem correta
+    const fontStack = "'DejaVu Sans', 'Liberation Sans', 'Noto Sans', 'Segoe UI', Arial, Helvetica, sans-serif";
+
+    // Monta o SVG vetorial completo com fontes universais compatíveis com Linux e Windows
     const fullSvg = `
       <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -131,12 +132,12 @@ export class BannerGenerator {
 
         <!-- 2. Header: Logo da Loja e Tag de Alerta -->
         <rect x="50" y="45" width="230" height="52" rx="26" fill="${primaryColor}" />
-        <text x="165" y="79" font-family="Arial, sans-serif" font-size="22" font-weight="900" fill="${primaryTextColor}" text-anchor="middle" letter-spacing="1">
+        <text x="165" y="79" font-family="${fontStack}" font-size="22" font-weight="900" fill="${primaryTextColor}" text-anchor="middle" letter-spacing="1">
           ${storeLabel}
         </text>
 
         <rect x="760" y="45" width="270" height="52" rx="26" fill="#1e293b" stroke="#334155" stroke-width="2" />
-        <text x="895" y="79" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#f8fafc" text-anchor="middle">
+        <text x="895" y="79" font-family="${fontStack}" font-size="20" font-weight="bold" fill="#f8fafc" text-anchor="middle">
           ⚡ OFERTA DO DIA
         </text>
 
@@ -147,7 +148,7 @@ export class BannerGenerator {
         ${productBase64 ? `
           <image href="${productBase64}" x="200" y="145" width="680" height="520" preserveAspectRatio="xMidYMid meet" />
         ` : `
-          <text x="540" y="420" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="#94a3b8" text-anchor="middle">
+          <text x="540" y="420" font-family="${fontStack}" font-size="32" font-weight="bold" fill="#94a3b8" text-anchor="middle">
             🛍️ OFERTA ESPECIAL
           </text>
         `}
@@ -155,7 +156,7 @@ export class BannerGenerator {
         <!-- 5. Selo de Desconto Flutuante no Topo do Card -->
         ${deal.discountPercent ? `
           <rect x="680" y="105" width="240" height="74" rx="20" fill="url(#badgeGrad)" filter="url(#cardShadow)" />
-          <text x="800" y="152" font-family="Arial, sans-serif" font-size="34" font-weight="900" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.5">
+          <text x="800" y="152" font-family="${fontStack}" font-size="34" font-weight="900" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.5">
             -${deal.discountPercent}% OFF
           </text>
         ` : ''}
@@ -163,17 +164,17 @@ export class BannerGenerator {
         <!-- 6. Frete Grátis Badge (se houver) -->
         ${deal.freeShipping ? `
           <rect x="205" y="625" width="190" height="42" rx="12" fill="#10b981" />
-          <text x="300" y="653" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#FFFFFF" text-anchor="middle">
+          <text x="300" y="653" font-family="${fontStack}" font-size="18" font-weight="bold" fill="#FFFFFF" text-anchor="middle">
             🚚 FRETE GRÁTIS
           </text>
         ` : ''}
 
         <!-- 7. Título do Produto -->
-        <text x="540" y="735" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#f8fafc" text-anchor="middle">
+        <text x="540" y="735" font-family="${fontStack}" font-size="30" font-weight="bold" fill="#f8fafc" text-anchor="middle">
           ${this.escapeXml(line1)}
         </text>
         ${line2 ? `
-          <text x="540" y="775" font-family="Arial, sans-serif" font-size="30" font-weight="bold" fill="#cbd5e1" text-anchor="middle">
+          <text x="540" y="775" font-family="${fontStack}" font-size="30" font-weight="bold" fill="#cbd5e1" text-anchor="middle">
             ${this.escapeXml(line2)}
           </text>
         ` : ''}
@@ -182,24 +183,24 @@ export class BannerGenerator {
         <rect x="100" y="810" width="880" height="150" rx="24" fill="#0f172a" stroke="#334155" stroke-width="2" />
 
         ${formattedOriginalPrice ? `
-          <text x="140" y="860" font-family="Arial, sans-serif" font-size="24" font-weight="500" fill="#94a3b8">
+          <text x="140" y="860" font-family="${fontStack}" font-size="24" font-weight="500" fill="#94a3b8">
             De: ${formattedOriginalPrice}
           </text>
           <line x1="135" y1="852" x2="350" y2="852" stroke="#ef4444" stroke-width="3" />
         ` : ''}
 
-        <text x="140" y="925" font-family="Arial, sans-serif" font-size="48" font-weight="900" fill="#22c55e">
+        <text x="140" y="925" font-family="${fontStack}" font-size="48" font-weight="900" fill="#22c55e">
           Por: ${formattedCurrentPrice}
         </text>
 
         <!-- 9. Botão Visual de Ação -->
         <rect x="650" y="840" width="300" height="90" rx="45" fill="${primaryColor}" />
-        <text x="800" y="895" font-family="Arial, sans-serif" font-size="26" font-weight="900" fill="${primaryTextColor}" text-anchor="middle">
+        <text x="800" y="895" font-family="${fontStack}" font-size="26" font-weight="900" fill="${primaryTextColor}" text-anchor="middle">
           APROVEITAR 👉
         </text>
 
         <!-- 10. Footer Rodapé -->
-        <text x="540" y="1020" font-family="Arial, sans-serif" font-size="18" font-weight="500" fill="#64748b" text-anchor="middle">
+        <text x="540" y="1020" font-family="${fontStack}" font-size="18" font-weight="500" fill="#64748b" text-anchor="middle">
           Confira o link no canal para comprar com o menor preço garantido!
         </text>
       </svg>

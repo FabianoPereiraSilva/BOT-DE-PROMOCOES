@@ -88,16 +88,32 @@ export function initDatabase() {
 
 // Database Helper Functions
 export const dbService = {
-  // Check if deal was already posted in a channel within deduplication hours
-  isDealAlreadyPosted(dealId: string, channelId = 'default', hoursThreshold = 48): boolean {
+  // Check if deal was already posted anywhere within deduplication window
+  isDealAlreadyPosted(deal: { id: string; originalUrl?: string; title?: string }, channelId = 'default', hoursThreshold = 72): boolean {
+    const cleanId = deal.id;
+    const cleanUrl = (deal.originalUrl || '').split('?')[0].split('#')[0];
+    const normalizedTitle = (deal.title || '').toLowerCase().trim().replace(/[^a-z0-9]/g, ' ').split(/\s+/).slice(0, 5).join(' ');
+
     const stmt = db.prepare(`
       SELECT 1 FROM posted_deals 
-      WHERE id = ? 
-      AND (channel_id = ? OR channel_id = 'default')
+      WHERE (
+        id = ? 
+        OR (length(?) > 10 AND original_url LIKE ?)
+        OR (length(?) > 5 AND lower(title) LIKE ?)
+      )
       AND datetime(posted_at) >= datetime('now', '-' || ? || ' hours')
       LIMIT 1
     `);
-    const result = stmt.get(dealId, channelId, hoursThreshold);
+
+    const result = stmt.get(
+      cleanId,
+      cleanUrl,
+      `%${cleanUrl}%`,
+      normalizedTitle,
+      `%${normalizedTitle}%`,
+      hoursThreshold
+    );
+
     return !!result;
   },
 

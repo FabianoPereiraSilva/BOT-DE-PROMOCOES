@@ -128,15 +128,15 @@ export class AutopilotEngine {
         // Ordena por maior desconto
         channelDeals.sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
 
-        // Filtra não duplicados especificamente para este canal
-        const freshDeals = channelDeals.filter(d => !dbService.isDealAlreadyPosted(d.id, channel.id, settings.deduplicationHours));
+        // Filtra estritamente ofertas não duplicadas (verifica ID, URL e título similar nos últimos dias)
+        const freshDeals = channelDeals.filter(d => !dbService.isDealAlreadyPosted(d, channel.id, settings.deduplicationHours || 72));
 
         if (freshDeals.length === 0) {
-          dbService.addLog('info', `[${channel.name}] Nenhuma oferta nova para postar neste ciclo (Deduplicação ativa).`);
+          dbService.addLog('info', `[${channel.name}] Todas as ofertas caçadas já foram postadas recentemente (Deduplicação rigorosa ativa).`);
           continue;
         }
 
-        // Seleciona a melhor oferta para enviar a este canal
+        // Seleciona a melhor oferta inédita para enviar a este canal
         const dealToPost = freshDeals[0];
 
         const pubResult = await TelegramPublisher.publishDeal(
