@@ -68,14 +68,15 @@ export class TelegramPublisher {
   }
 
   /**
-   * Publica uma oferta completa no Telegram com Banner Gerado e Botão de Compra
+   * Publica uma oferta completa no Telegram com Imagem Limpa Oficial do Produto e Botão de Compra
    */
   static async publishDeal(
     deal: Deal, 
-    customBannerBuffer?: Buffer,
+    customImageBuffer?: Buffer,
     targetChatId?: string,
     customBotToken?: string,
-    channelId?: string
+    channelId?: string,
+    customCaption?: string
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     const settings = getSystemSettings();
     const botToken = customBotToken || settings.telegramBotToken;
@@ -88,7 +89,7 @@ export class TelegramPublisher {
     }
 
     const buyUrl = CopyFormatter.getBuyUrl(deal, channelId);
-    const caption = CopyFormatter.formatTelegram(deal, channelId);
+    const caption = customCaption || (await CopyFormatter.formatTelegramWithAi(deal, channelId));
     const inlineKeyboard = {
       inline_keyboard: [
         [
@@ -101,21 +102,11 @@ export class TelegramPublisher {
     };
 
     try {
-      // 1. Gera o banner promocional se não fornecido
-      let bannerBuffer = customBannerBuffer;
-      if (!bannerBuffer) {
-        try {
-          bannerBuffer = await BannerGenerator.generateSquareBanner(deal);
-        } catch (bannerErr) {
-          console.warn('Erro ao gerar banner, tentando imagem original ou texto:', bannerErr);
-        }
-      }
-
-      // 2. Envio com Foto (Banner)
-      if (bannerBuffer) {
+      // 1. Se foi enviado um buffer personalizado (ex: upload manual)
+      if (customImageBuffer) {
         const form = new FormData();
         form.append('chat_id', chatId);
-        form.append('photo', bannerBuffer, { filename: 'promocao.jpg', contentType: 'image/jpeg' });
+        form.append('photo', customImageBuffer, { filename: 'produto.jpg', contentType: 'image/jpeg' });
         form.append('caption', caption);
         form.append('parse_mode', 'HTML');
         form.append('reply_markup', JSON.stringify(inlineKeyboard));
@@ -130,22 +121,47 @@ export class TelegramPublisher {
         return { success: true, messageId };
       }
 
-      // 3. Fallback: Envio apenas com link da imagem remota
+      // 2. Envio com Foto Limpa Oficial do Produto (sem bordas/preços falsos)
       if (deal.imageUrl) {
-        const response = await axios.post(`${this.getApiBase(botToken)}/sendPhoto`, {
-          chat_id: chatId,
-          photo: deal.imageUrl,
-          caption,
-          parse_mode: 'HTML',
-          reply_markup: inlineKeyboard
-        }, { timeout: 15000 });
+        try {
+          const response = await axios.post(`${this.getApiBase(botToken)}/sendPhoto`, {
+            chat_id: chatId,
+            photo: deal.imageUrl,
+            caption,
+            parse_mode: 'HTML',
+            reply_markup: inlineKeyboard
+          }, { timeout: 15000 });
 
-        const messageId = response.data?.result?.message_id?.toString();
-        dbService.addLog('success', `Oferta postada no Telegram com imagem remota (${chatId}): "${deal.title.substring(0, 40)}..."`, `Message ID: ${messageId}`);
-        return { success: true, messageId };
+          const messageId = response.data?.result?.message_id?.toString();
+          dbService.addLog('success', `Oferta postada no Telegram com foto do produto (${chatId}): "${deal.title.substring(0, 40)}..."`, `Message ID: ${messageId}`);
+          return { success: true, messageId };
+        } catch (photoErr: any) {
+          console.warn('Erro ao enviar foto por URL, tentando download do buffer:', photoErr.message);
+          // Tenta baixar a imagem e enviar como buffer se o Telegram rejeitar a URL direta
+          try {
+            const imgResp = await axios.get(deal.imageUrl, { responseType: 'arraybuffer', timeout: 10000 });
+            const form = new FormData();
+            form.append('chat_id', chatId);
+            form.append('photo', Buffer.from(imgResp.data), { filename: 'produto.jpg', contentType: 'image/jpeg' });
+            form.append('caption', caption);
+            form.append('parse_mode', 'HTML');
+            form.append('reply_markup', JSON.stringify(inlineKeyboard));
+
+            const response = await axios.post(`${this.getApiBase(botToken)}/sendPhoto`, form, {
+              headers: form.getHeaders(),
+              timeout: 20000
+            });
+
+            const messageId = response.data?.result?.message_id?.toString();
+            dbService.addLog('success', `Oferta postada no Telegram (${chatId}): "${deal.title.substring(0, 40)}..."`, `Message ID: ${messageId}`);
+            return { success: true, messageId };
+          } catch (bufferErr) {
+            console.warn('Falha no fallback de foto, enviando como texto:', bufferErr);
+          }
+        }
       }
 
-      // 4. Fallback: Envio em formato de texto simples
+      // 3. Fallback: Envio em formato de texto simples
       const response = await axios.post(`${this.getApiBase(botToken)}/sendMessage`, {
         chat_id: chatId,
         text: caption,

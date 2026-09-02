@@ -403,15 +403,54 @@ function initQuickPost() {
     }
   });
 
-  // Botão de Atualizar Banner
+  // Botão de Recalcular Texto
   document.getElementById('btn-re-render').addEventListener('click', async () => {
     if (!currentExtractedDeal) return;
 
     syncDealWithInputs();
-    await renderBannerPreview(currentExtractedDeal);
+    updateProductImagePreview(currentExtractedDeal);
     updateTelegramCaptionPreview(currentExtractedDeal);
-    showToast('Banner e copy atualizados!', 'success');
+    showToast('Texto atualizado com base nos preços!', 'success');
   });
+
+  // Botão de Gerar Copy com Gemini IA
+  const btnAiCopy = document.getElementById('btn-generate-ai-copy');
+  if (btnAiCopy) {
+    btnAiCopy.addEventListener('click', async () => {
+      if (!currentExtractedDeal) {
+        showToast('Extraia uma oferta primeiro.', 'error');
+        return;
+      }
+
+      syncDealWithInputs();
+      btnAiCopy.disabled = true;
+      btnAiCopy.textContent = '✨ Criando com Gemini IA...';
+
+      try {
+        const selectedChannel = document.getElementById('quick-post-channel-select').value;
+        const res = await fetch('/api/quick-post/generate-ai-copy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            deal: currentExtractedDeal,
+            channelId: selectedChannel
+          })
+        });
+        const data = await res.json();
+        if (data.success && data.copy) {
+          document.getElementById('tg-caption-preview').innerHTML = data.copy;
+          showToast('✨ Nova copy persuasiva gerada pelo Gemini IA!', 'success');
+        } else {
+          showToast(`Erro na IA: ${data.error || 'Verifique sua chave nas Configurações'}`, 'error');
+        }
+      } catch (err) {
+        showToast('Erro ao contatar IA', 'error');
+      } finally {
+        btnAiCopy.disabled = false;
+        btnAiCopy.textContent = '✨ Gerar com Gemini IA';
+      }
+    });
+  }
 
   // Botão de Publicar no Telegram
   document.getElementById('btn-publish-now').addEventListener('click', async () => {
@@ -424,6 +463,7 @@ function initQuickPost() {
 
     const btn = document.getElementById('btn-publish-now');
     const selectedChannel = document.getElementById('quick-post-channel-select').value;
+    const currentCaption = document.getElementById('tg-caption-preview').innerHTML;
 
     btn.disabled = true;
     btn.textContent = 'Publicando no Telegram...';
@@ -434,14 +474,15 @@ function initQuickPost() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           deal: currentExtractedDeal,
-          channelId: selectedChannel
+          channelId: selectedChannel,
+          customCaption: currentCaption
         })
       });
 
       const data = await res.json();
 
       if (data.success) {
-        showToast('🎉 Promoção publicada com sucesso no Telegram!', 'success');
+        showToast('🎉 Promoção publicada com sucesso no Telegram com foto do produto!', 'success');
         fetchStatus();
         fetchHistory();
       } else {
@@ -490,7 +531,7 @@ function openDealInStudio(deal, customCopy) {
   }
 
   previewStage.scrollIntoView({ behavior: 'smooth' });
-  renderBannerPreview(deal);
+  updateProductImagePreview(deal);
 }
 
 function displayDealPreview(deal, copyText) {
@@ -506,6 +547,17 @@ function displayDealPreview(deal, copyText) {
     document.getElementById('tg-caption-preview').innerHTML = copyText;
   } else {
     updateTelegramCaptionPreview(deal);
+  }
+}
+
+function updateProductImagePreview(deal) {
+  const img = document.getElementById('banner-preview-img');
+  const loading = document.getElementById('banner-loading');
+  if (img && deal.imageUrl) {
+    loading.classList.remove('hidden');
+    img.onload = () => loading.classList.add('hidden');
+    img.onerror = () => loading.classList.add('hidden');
+    img.src = deal.imageUrl;
   }
 }
 
@@ -530,31 +582,6 @@ function updateTelegramCaptionPreview(deal) {
   text += `\n\n🛒 <b>Compre com Desconto Seguro:</b>\n👉 <a href="${deal.affiliateUrl}">${deal.affiliateUrl}</a>`;
 
   document.getElementById('tg-caption-preview').innerHTML = text;
-}
-
-async function renderBannerPreview(deal) {
-  const loading = document.getElementById('banner-loading');
-  const img = document.getElementById('banner-preview-img');
-  loading.classList.remove('hidden');
-
-  try {
-    const res = await fetch('/api/quick-post/preview-banner', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(deal)
-    });
-
-    if (res.ok) {
-      const blob = await res.blob();
-      if (currentBannerBlobUrl) URL.revokeObjectURL(currentBannerBlobUrl);
-      currentBannerBlobUrl = URL.createObjectURL(blob);
-      img.src = currentBannerBlobUrl;
-    }
-  } catch (err) {
-    console.error('Erro ao renderizar banner preview:', err);
-  } finally {
-    loading.classList.add('hidden');
-  }
 }
 
 // ==========================================
@@ -793,6 +820,38 @@ function initSettings() {
     }
   });
 
+  // Testar Conexão Gemini IA
+  const btnTestGemini = document.getElementById('btn-test-gemini');
+  if (btnTestGemini) {
+    btnTestGemini.addEventListener('click', async () => {
+      const apiKey = document.getElementById('setting-gemini-key').value.trim();
+      const feedback = document.getElementById('gemini-test-feedback');
+      feedback.textContent = 'Testando conexão com Google Gemini IA...';
+      feedback.className = 'feedback-msg';
+
+      try {
+        const res = await fetch('/api/test-gemini', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          feedback.innerHTML = '✅ Conexão com Google Gemini IA estabelecida com sucesso!';
+          feedback.className = 'feedback-msg success';
+          showToast('Google Gemini IA validado com sucesso!', 'success');
+        } else {
+          feedback.innerHTML = `❌ ${data.error || 'Erro na chave de API do Gemini'}`;
+          feedback.className = 'feedback-msg error';
+        }
+      } catch (err) {
+        feedback.textContent = 'Erro ao se comunicar com o servidor.';
+        feedback.className = 'feedback-msg error';
+      }
+    });
+  }
+
   // Salvar Configurações
   document.getElementById('settings-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -817,7 +876,9 @@ function initSettings() {
       defaultKeywords,
       appBaseUrl: document.getElementById('setting-app-base-url')?.value.trim() || '',
       peakHoursOnly: document.getElementById('setting-peak-hours-only')?.checked || false,
-      peakHoursRanges: document.getElementById('setting-peak-hours-ranges')?.value.trim() || '07:30-09:30,11:45-14:00,18:30-22:30'
+      peakHoursRanges: document.getElementById('setting-peak-hours-ranges')?.value.trim() || '07:30-09:30,11:45-14:00,18:30-22:30',
+      geminiApiKey: document.getElementById('setting-gemini-key')?.value.trim() || '',
+      geminiAiEnabled: document.getElementById('setting-gemini-enabled')?.checked || false
     };
 
     try {
@@ -868,6 +929,12 @@ async function fetchSettings() {
       }
       if (document.getElementById('setting-peak-hours-ranges')) {
         document.getElementById('setting-peak-hours-ranges').value = s.peakHoursRanges || '07:30-09:30,11:45-14:00,18:30-22:30';
+      }
+      if (document.getElementById('setting-gemini-key') && s.geminiApiKey) {
+        document.getElementById('setting-gemini-key').value = s.geminiApiKey;
+      }
+      if (document.getElementById('setting-gemini-enabled')) {
+        document.getElementById('setting-gemini-enabled').checked = s.geminiAiEnabled !== false;
       }
     }
   } catch (err) {

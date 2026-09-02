@@ -37,7 +37,9 @@ export function getSystemSettings(): SystemSettings {
     customCopyTemplate: dbService.getSetting('customCopyTemplate', ''),
     appBaseUrl: dbService.getSetting('appBaseUrl', process.env.APP_BASE_URL || ''),
     peakHoursOnly: dbService.getSetting('peakHoursOnly', process.env.PEAK_HOURS_ONLY || 'false') === 'true',
-    peakHoursRanges: dbService.getSetting('peakHoursRanges', process.env.PEAK_HOURS_RANGES || '07:30-09:30,11:45-14:00,18:30-22:30')
+    peakHoursRanges: dbService.getSetting('peakHoursRanges', process.env.PEAK_HOURS_RANGES || '07:30-09:30,11:45-14:00,18:30-22:30'),
+    geminiApiKey: dbService.getSetting('geminiApiKey', process.env.GEMINI_API_KEY || ''),
+    geminiAiEnabled: dbService.getSetting('geminiAiEnabled', process.env.GEMINI_AI_ENABLED || 'true') === 'true'
   };
 }
 
@@ -64,6 +66,8 @@ export async function updateSystemSettings(settings: Partial<SystemSettings>): P
   if (settings.appBaseUrl !== undefined) ops.push(dbService.setSetting('appBaseUrl', settings.appBaseUrl.trim().replace(/\/$/, '')));
   if (settings.peakHoursOnly !== undefined) ops.push(dbService.setSetting('peakHoursOnly', settings.peakHoursOnly ? 'true' : 'false'));
   if (settings.peakHoursRanges !== undefined) ops.push(dbService.setSetting('peakHoursRanges', settings.peakHoursRanges));
+  if (settings.geminiApiKey !== undefined) ops.push(dbService.setSetting('geminiApiKey', settings.geminiApiKey.trim()));
+  if (settings.geminiAiEnabled !== undefined) ops.push(dbService.setSetting('geminiAiEnabled', settings.geminiAiEnabled ? 'true' : 'false'));
 
   // Persiste todas as settings em paralelo
   await Promise.all(ops);

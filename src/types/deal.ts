@@ -67,6 +67,8 @@ export interface SystemSettings {
   appBaseUrl?: string; // URL pública do servidor (ex: https://meubot.onrender.com) para links de rastreamento
   peakHoursOnly?: boolean; // Se verdadeiro, só publica nas janelas de pico
   peakHoursRanges?: string; // Ex: "07:30-09:30,11:45-14:00,18:30-22:30"
+  geminiApiKey?: string; // Chave de API do Google Gemini
+  geminiAiEnabled?: boolean; // Se verdadeiro, usa Gemini IA para gerar copies dos posts
 }
 
 export interface AutopilotLog {

@@ -1,5 +1,6 @@
 import { Deal } from '../types/deal.js';
 import { getSystemSettings } from '../config/env.js';
+import { GeminiCopywriter } from './gemini-copywriter.js';
 
 export class CopyFormatter {
   /**
@@ -22,6 +23,17 @@ export class CopyFormatter {
       return `${settings.appBaseUrl}/r/${deal.id}${chParam}`;
     }
     return deal.affiliateUrl;
+  }
+
+  /**
+   * Gera a copy promocional para Telegram usando Gemini IA se configurado, ou template padrão
+   */
+  static async formatTelegramWithAi(deal: Deal, channelId?: string): Promise<string> {
+    try {
+      return await GeminiCopywriter.generateDealCopy(deal, channelId);
+    } catch {
+      return this.formatTelegram(deal, channelId);
+    }
   }
 
   /**

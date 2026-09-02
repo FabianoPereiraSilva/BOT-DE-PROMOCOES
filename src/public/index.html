@@ -127,17 +127,17 @@
         <!-- Preview Area -->
         <div class="preview-stage hidden" id="preview-stage">
           <div class="preview-grid">
-            <!-- Left: Banner Card Preview -->
+            <!-- Left: Clean Product Image Preview -->
             <div class="glass-card preview-card">
               <div class="preview-card-header">
-                <h3>🖼️ Banner Promocional Gerado (1080x1080)</h3>
+                <h3>🖼️ Foto Oficial do Produto</h3>
                 <span class="badge" id="preview-store-badge">SHOPEE</span>
               </div>
               <div class="banner-display-wrapper">
-                <img id="banner-preview-img" src="" alt="Banner da Promoção">
+                <img id="banner-preview-img" src="" alt="Foto do Produto" style="object-fit: contain; max-height: 480px; width: 100%; border-radius: 8px;">
                 <div class="banner-loading hidden" id="banner-loading">
                   <div class="spinner"></div>
-                  <span>Renderizando arte em alta resolução...</span>
+                  <span>Carregando imagem do produto...</span>
                 </div>
               </div>
             </div>
@@ -185,7 +185,10 @@
 
                 <div class="action-buttons">
                   <button type="button" class="btn-secondary" id="btn-re-render">
-                    🔄 Atualizar Banner
+                    🔄 Recalcular Texto
+                  </button>
+                  <button type="button" class="btn-secondary" id="btn-generate-ai-copy" style="background: linear-gradient(135deg, #6366f1, #a855f7); color: #fff; border: none;">
+                    ✨ Gerar com Gemini IA
                   </button>
                   <button type="button" class="btn-success" id="btn-publish-now">
                     📢 Publicar no Telegram Agora!
@@ -605,6 +608,44 @@
               <div class="form-group">
                 <label for="setting-shopee-secret">Shopee Secret (Opcional - Open API):</label>
                 <input type="password" id="setting-shopee-secret" placeholder="••••••••••••">
+              </div>
+            </div>
+          </div>
+
+          <!-- Gemini IA Section -->
+          <div class="glass-card settings-section">
+            <div class="section-title">
+              <span class="section-badge" style="background: linear-gradient(135deg, #6366f1, #a855f7); color: #fff;">4</span>
+              <div>
+                <h3>🧠 Inteligência Artificial (Google Gemini IA)</h3>
+                <p>Gere copies persuasivas, criativas e de alta conversão automaticamente para cada produto.</p>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group full-width">
+                <label for="setting-gemini-key">🔑 Chave de API do Google Gemini (Gemini API Key):</label>
+                <div class="input-with-button">
+                  <input type="password" id="setting-gemini-key" placeholder="Ex: AIzaSy...">
+                  <button type="button" class="btn-secondary" id="btn-test-gemini" style="background: linear-gradient(135deg, #6366f1, #a855f7); color: #fff; border: none;">
+                    🧪 Testar Conexão Gemini
+                  </button>
+                </div>
+                <small>Obtenha sua chave gratuita em <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent);">Google AI Studio</a>. Se vazia, o bot usará o template padrão.</small>
+                <span id="gemini-test-feedback" class="feedback-msg"></span>
+              </div>
+
+              <div class="form-group full-width">
+                <div class="toggle-switch-wrapper">
+                  <label class="switch">
+                    <input type="checkbox" id="setting-gemini-enabled" checked>
+                    <span class="slider round"></span>
+                  </label>
+                  <div class="switch-text">
+                    <strong>Ativar Copywriting com Gemini IA</strong>
+                    <p>O robô usará o Gemini para criar ganchos e destacar benefícios antes de postar no Telegram.</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

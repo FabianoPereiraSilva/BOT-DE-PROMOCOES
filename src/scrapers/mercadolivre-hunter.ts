@@ -114,6 +114,12 @@ export class MercadoLivreHunter {
         [currentPrice, originalPrice] = [originalPrice, currentPrice];
       }
 
+      // Se não encontrou o preço original mas tem o desconto e preço atual, calcula matematicamente
+      if (!originalPrice && currentPrice && discountPercent && discountPercent > 0 && discountPercent < 99) {
+        originalPrice = Math.round((currentPrice / (1 - (discountPercent / 100))) * 100) / 100;
+      }
+
+      // Se tem os dois preços mas não tem o desconto, calcula a porcentagem
       if (!discountPercent && originalPrice && currentPrice && originalPrice > currentPrice) {
         discountPercent = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
       }
@@ -270,6 +276,12 @@ export class MercadoLivreHunter {
               [currentPrice, originalPrice] = [originalPrice, currentPrice];
             }
 
+            // Se não encontrou o preço original mas tem o desconto e preço atual, calcula matematicamente
+            if (!originalPrice && currentPrice && discountPercent && discountPercent > 0 && discountPercent < 99) {
+              originalPrice = Math.round((currentPrice / (1 - (discountPercent / 100))) * 100) / 100;
+            }
+
+            // Se tem os dois preços mas não tem o desconto, calcula a porcentagem
             if (!discountPercent && originalPrice && currentPrice && originalPrice > currentPrice) {
               discountPercent = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
             }

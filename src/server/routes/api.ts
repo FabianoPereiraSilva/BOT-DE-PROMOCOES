@@ -109,6 +109,8 @@ apiRouter.post('/channels/:id/test', async (req: Request, res: Response) => {
   }
 });
 
+import { GeminiCopywriter } from '../../generator/gemini-copywriter.js';
+
 // 4. Obter Configurações Gerais
 apiRouter.get('/settings', (req: Request, res: Response) => {
   const settings = getSystemSettings();
@@ -116,7 +118,8 @@ apiRouter.get('/settings', (req: Request, res: Response) => {
     success: true,
     settings: {
       ...settings,
-      telegramBotToken: settings.telegramBotToken ? `${settings.telegramBotToken.substring(0, 8)}...` : ''
+      telegramBotToken: settings.telegramBotToken ? `${settings.telegramBotToken.substring(0, 8)}...` : '',
+      geminiApiKey: settings.geminiApiKey ? `${settings.geminiApiKey.substring(0, 8)}...` : ''
     }
   });
 });
@@ -128,6 +131,9 @@ apiRouter.post('/settings', async (req: Request, res: Response) => {
 
     if (payload.telegramBotToken && payload.telegramBotToken.includes('...')) {
       delete payload.telegramBotToken;
+    }
+    if (payload.geminiApiKey && payload.geminiApiKey.includes('...')) {
+      delete payload.geminiApiKey;
     }
 
     const updated = await updateSystemSettings(payload);
@@ -150,6 +156,14 @@ apiRouter.post('/settings', async (req: Request, res: Response) => {
 apiRouter.post('/test-telegram', async (req: Request, res: Response) => {
   const { botToken, chatId } = req.body;
   const result = await TelegramPublisher.testConnection(botToken, chatId);
+  res.json(result);
+});
+
+// 6.1 Testar Conexão com Gemini IA
+apiRouter.post('/test-gemini', async (req: Request, res: Response) => {
+  const { apiKey } = req.body;
+  const key = apiKey && !apiKey.includes('...') ? apiKey : getSystemSettings().geminiApiKey;
+  const result = await GeminiCopywriter.testApiKey(key || '');
   res.json(result);
 });
 
@@ -181,13 +195,27 @@ apiRouter.post('/quick-post/extract', async (req: Request, res: Response) => {
       });
     }
 
-    const previewCopy = CopyFormatter.formatTelegram(deal);
+    const previewCopy = await CopyFormatter.formatTelegramWithAi(deal);
 
     res.json({
       success: true,
       deal,
       previewCopy
     });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 7.1 Gerar Copy com Gemini IA no Studio
+apiRouter.post('/quick-post/generate-ai-copy', async (req: Request, res: Response) => {
+  try {
+    const { deal, channelId } = req.body;
+    if (!deal || !deal.title) {
+      return res.status(400).json({ success: false, error: 'Dados do produto incompletos.' });
+    }
+    const copy = await GeminiCopywriter.generateDealCopy(deal, channelId);
+    res.json({ success: true, copy });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
