@@ -1,6 +1,7 @@
 import { Deal } from '../types/deal.js';
 import { getSystemSettings } from '../config/env.js';
 import { GeminiCopywriter } from './gemini-copywriter.js';
+import { LinkConverter } from './link-converter.js';
 
 export class CopyFormatter {
   /**
@@ -32,17 +33,18 @@ export class CopyFormatter {
     try {
       return await GeminiCopywriter.generateDealCopy(deal, channelId);
     } catch {
-      return this.formatTelegram(deal, channelId);
+      return await this.formatTelegram(deal, channelId);
     }
   }
 
   /**
    * Gera a copy promocional para Telegram (em formato HTML do Telegram)
    */
-  static formatTelegram(deal: Deal, channelId?: string): string {
+  static async formatTelegram(deal: Deal, channelId?: string): Promise<string> {
     const settings = getSystemSettings();
     const customTemplate = settings.customCopyTemplate?.trim();
-    const buyUrl = this.getBuyUrl(deal, channelId);
+    const rawUrl = this.getBuyUrl(deal, channelId);
+    const buyUrl = await LinkConverter.shortenUrl(rawUrl);
 
     const storeEmoji = deal.store === 'shopee' ? '🟠' : '🟡';
     const storeName = deal.store === 'shopee' ? 'SHOPEE' : 'MERCADO LIVRE';
@@ -63,16 +65,11 @@ export class CopyFormatter {
         .replace(/{cupom}/gi, deal.couponCode ? `🎟️ Cupom: <b>${deal.couponCode}</b>` : '');
     }
 
-    // Template padrão ultra atraente e com alta conversão
+    // Template padrão limpo e com alta conversão
     const lines: string[] = [];
-
-    // Header com Urgência
-    lines.push(`🚨 <b>OFERTA IMPERDÍVEL NA ${storeName}!</b> 🚨`);
-    lines.push('');
 
     // Título do Produto
     lines.push(`📦 <b>${this.escapeHtml(deal.title)}</b>`);
-    lines.push('');
 
     // Bloco de Preço
     if (formattedOriginalPrice) {

@@ -2,6 +2,7 @@ import axios from 'axios';
 import { Deal } from '../types/deal.js';
 import { getSystemSettings } from '../config/env.js';
 import { CopyFormatter } from './copy-formatter.js';
+import { LinkConverter } from './link-converter.js';
 
 export class GeminiCopywriter {
   // Lista de modelos suportados por ordem de prioridade
@@ -58,7 +59,8 @@ export class GeminiCopywriter {
     const settings = getSystemSettings();
     const apiKey = settings.geminiApiKey?.trim();
     const isEnabled = settings.geminiAiEnabled !== false;
-    const buyUrl = CopyFormatter.getBuyUrl(deal, channelId);
+    const rawUrl = CopyFormatter.getBuyUrl(deal, channelId);
+    const buyUrl = await LinkConverter.shortenUrl(rawUrl);
     const storeName = deal.store === 'shopee' ? 'Shopee' : 'Mercado Livre';
     const currPriceFormatted = CopyFormatter.formatCurrency(deal.currentPrice);
     const origPriceFormatted = deal.originalPrice ? CopyFormatter.formatCurrency(deal.originalPrice) : null;
@@ -112,11 +114,7 @@ Instruções:
     // Monta a estrutura 100% blindada e garantida
     const lines: string[] = [];
 
-    // 1. Header de Atenção
-    lines.push(`🚨 <b>OFERTA IMPERDÍVEL NA ${storeName.toUpperCase()}!</b> 🚨`);
-    lines.push('');
-
-    // 2. Título Oficial do Produto
+    // 1. Título Oficial do Produto
     lines.push(`📦 <b>${this.escapeHtml(deal.title)}</b>`);
 
     // 3. Gancho / Benefício Persuasivo gerado por IA

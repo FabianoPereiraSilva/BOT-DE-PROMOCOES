@@ -98,4 +98,23 @@ export class LinkConverter {
 
     return response.data?.data?.generateShortLink?.shortLink || null;
   }
+
+  /**
+   * Encurta qualquer URL usando TinyURL (gratuito, sem API key)
+   */
+  static async shortenUrl(url: string): Promise<string> {
+    try {
+      const response = await axios.get(
+        `https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`,
+        { timeout: 5000 }
+      );
+      const shortened = response.data?.trim();
+      if (shortened && shortened.startsWith('http')) {
+        return shortened;
+      }
+    } catch {
+      // fallback silencioso
+    }
+    return url;
+  }
 }
