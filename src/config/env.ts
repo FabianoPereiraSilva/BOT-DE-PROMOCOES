@@ -39,7 +39,9 @@ export function getSystemSettings(): SystemSettings {
     peakHoursOnly: dbService.getSetting('peakHoursOnly', process.env.PEAK_HOURS_ONLY || 'false') === 'true',
     peakHoursRanges: dbService.getSetting('peakHoursRanges', process.env.PEAK_HOURS_RANGES || '07:30-09:30,11:45-14:00,18:30-22:30'),
     geminiApiKey: dbService.getSetting('geminiApiKey', process.env.GEMINI_API_KEY || ''),
-    geminiAiEnabled: dbService.getSetting('geminiAiEnabled', process.env.GEMINI_AI_ENABLED || 'true') === 'true'
+    geminiAiEnabled: dbService.getSetting('geminiAiEnabled', process.env.GEMINI_AI_ENABLED || 'true') === 'true',
+    mlAppId: dbService.getSetting('mlAppId', process.env.ML_APP_ID || ''),
+    mlClientSecret: dbService.getSetting('mlClientSecret', process.env.ML_CLIENT_SECRET || '')
   };
 }
 
@@ -68,6 +70,8 @@ export async function updateSystemSettings(settings: Partial<SystemSettings>): P
   if (settings.peakHoursRanges !== undefined) ops.push(dbService.setSetting('peakHoursRanges', settings.peakHoursRanges));
   if (settings.geminiApiKey !== undefined) ops.push(dbService.setSetting('geminiApiKey', settings.geminiApiKey.trim()));
   if (settings.geminiAiEnabled !== undefined) ops.push(dbService.setSetting('geminiAiEnabled', settings.geminiAiEnabled ? 'true' : 'false'));
+  if (settings.mlAppId !== undefined) ops.push(dbService.setSetting('mlAppId', settings.mlAppId.trim()));
+  if (settings.mlClientSecret !== undefined) ops.push(dbService.setSetting('mlClientSecret', settings.mlClientSecret.trim()));
 
   // Persiste todas as settings em paralelo
   await Promise.all(ops);
