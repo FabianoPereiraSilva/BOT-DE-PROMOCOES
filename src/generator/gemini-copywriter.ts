@@ -4,28 +4,47 @@ import { getSystemSettings } from '../config/env.js';
 import { CopyFormatter } from './copy-formatter.js';
 
 export class GeminiCopywriter {
+  // Lista de modelos suportados por ordem de prioridade
+  private static readonly MODELS = [
+    'gemini-3.5-flash',
+    'gemini-3.1-flash-lite-preview',
+    'gemini-3.8-flash',
+    'gemini-3.6-flash',
+    'gemini-flash-latest',
+    'gemini-2.5-flash',
+    'gemini-1.5-flash'
+  ];
+
   /**
    * Testa se a chave do Gemini API é válida fazendo uma requisição mínima
    */
-  static async testApiKey(apiKey: string): Promise<{ success: boolean; error?: string }> {
+  static async testApiKey(apiKey: string): Promise<{ success: boolean; error?: string; modelUsed?: string }> {
     try {
       const key = apiKey.trim();
       if (!key) return { success: false, error: 'Chave do Gemini API não informada.' };
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`;
-      const payload = {
-        contents: [
-          {
-            parts: [{ text: 'Responda apenas: OK' }]
-          }
-        ]
-      };
+      let lastError = '';
+      for (const model of this.MODELS) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+          const payload = {
+            contents: [
+              {
+                parts: [{ text: 'Responda apenas: OK' }]
+              }
+            ]
+          };
 
-      const resp = await axios.post(url, payload, { timeout: 8000 });
-      if (resp.status === 200) {
-        return { success: true };
+          const resp = await axios.post(url, payload, { timeout: 7000 });
+          if (resp.status === 200) {
+            return { success: true, modelUsed: model };
+          }
+        } catch (mErr: any) {
+          lastError = mErr.response?.data?.error?.message || mErr.message;
+        }
       }
-      return { success: false, error: `Status ${resp.status}` };
+
+      return { success: false, error: lastError || 'Nenhum modelo compatível com esta chave.' };
     } catch (err: any) {
       const errMsg = err.response?.data?.error?.message || err.message;
       return { success: false, error: errMsg };
@@ -85,10 +104,7 @@ REGRAS ESTREITAS DE FORMATAÇÃO DO TELEGRAM:
    - Hashtags temáticas do nicho e da loja (#${deal.store === 'shopee' ? 'Shopee' : 'MercadoLivre'} #Promoção #Ofertas)
 4. Mantenha o texto limpo, sem caracteres estranhos e com espaçamento harmônico.`;
 
-    // Tenta primeiro o modelo gemini-2.5-flash e depois gemini-1.5-flash
-    const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
-
-    for (const model of models) {
+    for (const model of this.MODELS) {
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
         const response = await axios.post(
