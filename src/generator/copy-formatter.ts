@@ -63,8 +63,10 @@ export class CopyFormatter {
     lines.push('');
 
     // Bloco de Preço
-    if (formattedOriginalPrice && deal.discountPercent) {
+    if (formattedOriginalPrice) {
       lines.push(`❌ De: <s>${formattedOriginalPrice}</s>`);
+      lines.push(`🔥 <b>Por: ${formattedCurrentPrice}</b>${deal.discountPercent ? ` (${deal.discountPercent}% de desconto!)` : ''}`);
+    } else if (deal.discountPercent) {
       lines.push(`🔥 <b>Por: ${formattedCurrentPrice}</b> (${deal.discountPercent}% de desconto!)`);
     } else {
       lines.push(`🔥 <b>Por apenas: ${formattedCurrentPrice}</b>`);

@@ -81,12 +81,19 @@ export class MercadoLivreHunter {
         imageUrl = imageUrl.replace('-I.jpg', '-O.jpg');
       }
 
-      // Preço atual
-      let currentPrice: number | undefined;
+      // Preço original (riscado / antes)
+      let originalPrice: number | undefined;
+      const originalElem = $('.ui-pdp-price__original-value .andes-money-amount, .andes-money-amount--previous, s.andes-money-amount').first();
+      originalPrice = this.extractPriceFromElement($, originalElem);
 
-      // 1. Tenta pegar do elemento visual principal do preço (segunda linha ou preço primário)
-      const currentElem = $('.ui-pdp-price__second-line .andes-money-amount, .andes-money-amount--primary, .ui-pdp-price .andes-money-amount').first();
+      // Preço atual promocional (NUNCA pegar o --previous)
+      let currentPrice: number | undefined;
+      const currentElem = $('.ui-pdp-price__second-line .andes-money-amount, .andes-money-amount--primary, .ui-pdp-price__part:not(.ui-pdp-price__original-value) .andes-money-amount:not(.andes-money-amount--previous), .andes-money-amount:not(.andes-money-amount--previous)').first();
       currentPrice = this.extractPriceFromElement($, currentElem);
+
+      if (!currentPrice && ldJsonData?.offers?.price) {
+        currentPrice = Number(ldJsonData.offers.price);
+      }
 
       if (!currentPrice) {
         const priceMeta = $('meta[itemprop="price"]').attr('content') ||
@@ -94,17 +101,17 @@ export class MercadoLivreHunter {
         currentPrice = cleanPrice(priceMeta);
       }
 
-      // Preço original (riscado / antes)
-      let originalPrice: number | undefined;
-      const originalElem = $('.ui-pdp-price__original-value .andes-money-amount, .andes-money-amount--previous, s.andes-money-amount').first();
-      originalPrice = this.extractPriceFromElement($, originalElem);
-
       // Desconto percentual
       let discountPercent: number | undefined;
       const discountText = $('.ui-pdp-price__second-line .andes-money-amount__discount, .andes-money-amount__discount, .ui-pdp-price__discount').first().text().trim();
       if (discountText) {
         const match = discountText.match(/(\d+)%/);
         if (match) discountPercent = parseInt(match[1], 10);
+      }
+
+      // Se os preços foram invertidos, corrige colocando o menor em currentPrice
+      if (originalPrice && currentPrice && originalPrice < currentPrice) {
+        [currentPrice, originalPrice] = [originalPrice, currentPrice];
       }
 
       if (!discountPercent && originalPrice && currentPrice && originalPrice > currentPrice) {
@@ -124,7 +131,7 @@ export class MercadoLivreHunter {
         id,
         store: 'mercadolivre',
         title,
-        originalPrice: originalPrice && originalPrice > currentPrice ? originalPrice : undefined,
+        originalPrice: originalPrice && currentPrice && originalPrice > currentPrice ? originalPrice : undefined,
         currentPrice: currentPrice || 0,
         discountPercent: discountPercent && discountPercent > 0 ? discountPercent : undefined,
         imageUrl,
@@ -240,15 +247,15 @@ export class MercadoLivreHunter {
               if (!isRelevant) return;
             }
 
-            // Preço atual (prioriza o preço principal fora do buy-box alternativo)
-            const currentPriceElem = card.find('.poly-component__price > .poly-price__current .andes-money-amount, .poly-price__current .andes-money-amount, .promotion-item__price .andes-money-amount, .ui-search-price__second-line .andes-money-amount, .andes-money-amount').first();
-            const currentPrice = this.extractPriceFromElement($, currentPriceElem);
+            // 1. Preço original (riscado / antes)
+            const originalPriceElem = card.find('.andes-money-amount--previous, s.andes-money-amount, .poly-component__price .andes-money-amount--previous, .ui-search-price__original-value .andes-money-amount').first();
+            let originalPrice = this.extractPriceFromElement($, originalPriceElem);
+
+            // 2. Preço atual promocional (NUNCA pegar o elemento com classe --previous)
+            const currentPriceElem = card.find('.poly-price__current .andes-money-amount, .ui-search-price__second-line .andes-money-amount, .promotion-item__price .andes-money-amount, .poly-component__price .andes-money-amount:not(.andes-money-amount--previous), .andes-money-amount:not(.andes-money-amount--previous)').first();
+            let currentPrice = this.extractPriceFromElement($, currentPriceElem);
 
             if (!currentPrice || currentPrice < minPrice) return;
-
-            // Preço original (riscado / antes)
-            const originalPriceElem = card.find('.poly-component__price .andes-money-amount--previous, .andes-money-amount--previous, .promotion-item__old-price .andes-money-amount, .ui-search-price__original-value .andes-money-amount, s.andes-money-amount').first();
-            const originalPrice = this.extractPriceFromElement($, originalPriceElem);
 
             // Desconto percentual
             const discountText = card.find('.poly-price__discount-polylabel, .andes-money-amount__discount, .promotion-item__discount, .ui-search-price__discount').first().text().trim();
@@ -258,7 +265,12 @@ export class MercadoLivreHunter {
               if (match) discountPercent = parseInt(match[1], 10);
             }
 
-            if (!discountPercent && originalPrice && originalPrice > currentPrice) {
+            // Se os preços foram invertidos, corrige colocando o menor em currentPrice
+            if (originalPrice && currentPrice && originalPrice < currentPrice) {
+              [currentPrice, originalPrice] = [originalPrice, currentPrice];
+            }
+
+            if (!discountPercent && originalPrice && currentPrice && originalPrice > currentPrice) {
               discountPercent = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
             }
 
@@ -275,7 +287,7 @@ export class MercadoLivreHunter {
               store: 'mercadolivre',
               category: categoryKey,
               title,
-              originalPrice: originalPrice && originalPrice > currentPrice ? originalPrice : undefined,
+              originalPrice: originalPrice && currentPrice && originalPrice > currentPrice ? originalPrice : undefined,
               currentPrice,
               discountPercent,
               imageUrl,
