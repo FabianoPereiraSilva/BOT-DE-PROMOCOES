@@ -9,6 +9,8 @@ import { CopyFormatter } from '../../generator/copy-formatter.js';
 import { AutopilotEngine } from '../../autopilot/engine.js';
 import { CATEGORY_PRESETS } from '../../config/categories.js';
 import { ChannelConfig, Deal } from '../../types/deal.js';
+import { LinkConverter } from '../../generator/link-converter.js';
+import { MercadoLivreApiClient } from '../../scrapers/ml-api-client.js';
 import crypto from 'crypto';
 
 export const apiRouter = Router();
@@ -369,6 +371,32 @@ apiRouter.get('/analytics/clicks', async (req: Request, res: Response) => {
       stats,
       topDeals
     });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 15. Teste do Encurtador de Links
+apiRouter.get('/test-shorten', async (req: Request, res: Response) => {
+  const testUrl = (req.query.url as string) || 'https://www.mercadolivre.com.br/bicicleta-spinning/p/MLB34219371?matt_tool=43617720&matt_word=pefa86946';
+  try {
+    const shortened = await LinkConverter.shortenUrl(testUrl);
+    res.json({
+      success: true,
+      original: testUrl,
+      shortened,
+      wasShortened: shortened !== testUrl
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 16. Teste da API Oficial do Mercado Livre
+apiRouter.get('/test-ml', async (req: Request, res: Response) => {
+  try {
+    const result = await MercadoLivreApiClient.testConnection();
+    res.json(result);
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
