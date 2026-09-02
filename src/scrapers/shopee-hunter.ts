@@ -2,7 +2,7 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import crypto from 'crypto';
 import { Deal } from '../types/deal.js';
-import { fetchHtml, fetchJson, cleanPrice, getRandomUserAgent } from './base-scraper.js';
+import { fetchHtml, fetchShopeeApi, cleanPrice, getRandomUserAgent } from './base-scraper.js';
 import { LinkConverter } from '../generator/link-converter.js';
 import { CATEGORY_PRESETS } from '../config/categories.js';
 
@@ -55,10 +55,7 @@ export class ShopeeHunter {
       if (shopId && itemId) {
         try {
           const apiUrl = `https://shopee.com.br/api/v4/item/get?itemid=${itemId}&shopid=${shopId}`;
-          const itemData = await fetchJson(apiUrl, {
-            'x-api-source': 'pc',
-            'Referer': finalUrl
-          });
+          const itemData = await fetchShopeeApi(apiUrl);
 
           const data = itemData?.data;
           if (data && data.name) {
@@ -131,7 +128,143 @@ export class ShopeeHunter {
   }
 
   /**
+   * Tenta buscar ofertas via scraping HTML da página de busca da Shopee
+   */
+  private static async huntViaHtmlScraping(
+    keyword: string,
+    minDiscount: number,
+    minPrice: number,
+    categoryKey: string
+  ): Promise<Deal[]> {
+    const deals: Deal[] = [];
+
+    try {
+      const searchUrl = `https://shopee.com.br/search?keyword=${encodeURIComponent(keyword)}&sortBy=sales`;
+      const html = await fetchHtml(searchUrl, {
+        'Referer': 'https://shopee.com.br/',
+        'Cookie': 'SPC_F=undefined; REC_T_ID=undefined;'
+      });
+
+      if (!html || html.length < 500) {
+        console.warn(`[Shopee HTML] Página de busca retornou vazia para "${keyword}"`);
+        return deals;
+      }
+
+      const $ = cheerio.load(html);
+
+      // Tenta extrair dados embutidos no JSON do SSR (script tags com dados de busca)
+      const scripts = $('script').toArray();
+      for (const script of scripts) {
+        const scriptContent = $(script).html() || '';
+
+        // Shopee frequentemente embute dados de itens em JSON dentro de <script>
+        const jsonMatches = scriptContent.match(/"item_basic"\s*:\s*\{[^}]+\}/g);
+        if (!jsonMatches) continue;
+
+        for (const match of jsonMatches) {
+          try {
+            // Tenta reconstruir o objeto JSON parcial
+            const itemJson = `{${match}}`;
+            const parsed = JSON.parse(itemJson);
+            const item = parsed.item_basic;
+            if (!item || !item.name) continue;
+
+            const currentPrice = item.price ? item.price / 100000 : (item.price_min ? item.price_min / 100000 : 0);
+            const originalPrice = item.price_before_discount ? item.price_before_discount / 100000 : currentPrice;
+
+            if (currentPrice < minPrice) continue;
+
+            let discountPercent = item.raw_discount || 0;
+            if (!discountPercent && originalPrice > currentPrice) {
+              discountPercent = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+            }
+
+            if (discountPercent < minDiscount) continue;
+
+            const imageHash = item.image || (item.images && item.images[0]) || '';
+            const imageUrl = imageHash ? `https://down-br.img.susercontent.com/file/${imageHash}` : '';
+            const originalUrl = `https://shopee.com.br/product/${item.shopid}/${item.itemid}`;
+            const affiliateUrl = await LinkConverter.convertShopee(originalUrl);
+
+            deals.push({
+              id: `shopee_${item.itemid}`,
+              store: 'shopee',
+              category: categoryKey,
+              title: item.name,
+              originalPrice: originalPrice > currentPrice ? originalPrice : undefined,
+              currentPrice,
+              discountPercent: discountPercent > 0 ? discountPercent : undefined,
+              imageUrl,
+              originalUrl,
+              affiliateUrl,
+              freeShipping: item.show_free_shipping || false
+            });
+
+            if (deals.length >= 10) break;
+          } catch {
+            // JSON parcial inválido, pula
+          }
+        }
+
+        if (deals.length > 0) break;
+      }
+
+      // Fallback: tenta extrair de meta tags e links de produto na página
+      if (deals.length === 0) {
+        const productLinks = $('a[href*="/product/"], a[data-sqe="link"]').toArray();
+        console.log(`[Shopee HTML] Encontrados ${productLinks.length} links de produto para "${keyword}"`);
+
+        for (const link of productLinks.slice(0, 5)) {
+          const href = $(link).attr('href');
+          if (!href) continue;
+
+          const fullUrl = href.startsWith('http') ? href : `https://shopee.com.br${href}`;
+          const productMatch = fullUrl.match(/product\/(\d+)\/(\d+)/);
+          if (!productMatch) continue;
+
+          // Tenta extrair info do card HTML
+          const card = $(link).closest('[data-sqe="item"]').length > 0
+            ? $(link).closest('[data-sqe="item"]')
+            : $(link).parent();
+
+          const title = card.find('[data-sqe="name"]').text().trim() ||
+                       $(link).text().trim() ||
+                       card.find('div').first().text().trim();
+
+          if (!title || title.length < 5) continue;
+
+          const priceText = card.find('[class*="price"]').text();
+          const currentPrice = cleanPrice(priceText);
+
+          if (currentPrice && currentPrice >= minPrice) {
+            const originalUrl = `https://shopee.com.br/product/${productMatch[1]}/${productMatch[2]}`;
+            const affiliateUrl = await LinkConverter.convertShopee(originalUrl);
+
+            deals.push({
+              id: `shopee_${productMatch[2]}`,
+              store: 'shopee',
+              category: categoryKey,
+              title,
+              currentPrice,
+              imageUrl: '',
+              originalUrl,
+              affiliateUrl
+            });
+          }
+
+          if (deals.length >= 5) break;
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[Shopee HTML] Erro ao fazer scraping de busca para "${keyword}":`, err.message);
+    }
+
+    return deals;
+  }
+
+  /**
    * Caçador de Ofertas com alto desconto da Shopee (Geral ou por Categoria/Palavras-chave)
+   * Estratégia: 1) Tenta API v4 com headers anti-bot  2) Fallback: scraping HTML
    */
   static async huntDeals(
     minDiscount = 20, 
@@ -151,21 +284,16 @@ export class ShopeeHunter {
       searchKeywords = customKeywords.length > 0 ? customKeywords : preset.defaultKeywords;
     }
 
-    const browserHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-      'Accept': 'application/json, text/plain, */*',
-      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-      'x-api-source': 'pc',
-      'x-shopee-language': 'pt-BR',
-      'x-requested-with': 'XMLHttpRequest',
-      'Referer': 'https://shopee.com.br/'
-    };
-
     for (const kw of searchKeywords.slice(0, 3)) {
       try {
+        // === TENTATIVA 1: API v4 com headers anti-bot melhorados ===
         const searchUrl = `https://shopee.com.br/api/v4/search/search_items?by=sales&keyword=${encodeURIComponent(kw)}&limit=30&newest=0&order=desc&page_type=search&scenario=PAGE_GLOBAL_SEARCH&version=2`;
-        const response = await fetchJson(searchUrl, browserHeaders);
+        const response = await fetchShopeeApi(searchUrl);
         const items = response?.items || [];
+
+        if (items.length > 0) {
+          console.log(`[Shopee API] ✅ ${items.length} itens encontrados para "${kw}"`);
+        }
 
         for (const container of items) {
           try {
@@ -211,12 +339,34 @@ export class ShopeeHunter {
           }
         }
 
+        // === TENTATIVA 2: Se API falhou (0 itens), tenta scraping HTML ===
+        if (items.length === 0) {
+          console.log(`[Shopee] API v4 retornou 0 itens para "${kw}", tentando scraping HTML...`);
+          const htmlDeals = await this.huntViaHtmlScraping(kw, minDiscount, minPrice, categoryKey);
+          if (htmlDeals.length > 0) {
+            console.log(`[Shopee HTML] ✅ ${htmlDeals.length} ofertas encontradas via HTML para "${kw}"`);
+            deals.push(...htmlDeals);
+          } else {
+            console.log(`[Shopee HTML] ⚠️ Nenhuma oferta encontrada via HTML para "${kw}"`);
+          }
+        }
+
         if (deals.length >= 10) break;
-      } catch (err) {
-        // Tenta próxima keyword silenciosamente
+      } catch (err: any) {
+        console.warn(`[Shopee] Erro geral na busca por "${kw}":`, err.message);
+        // Tenta scraping HTML como último recurso
+        try {
+          const htmlDeals = await this.huntViaHtmlScraping(kw, minDiscount, minPrice, categoryKey);
+          deals.push(...htmlDeals);
+        } catch {}
       }
+    }
+
+    if (deals.length === 0) {
+      console.log(`[Shopee Hunter] ⚠️ Nenhuma oferta encontrada para categoria "${categoryKey}" (keywords: ${searchKeywords.slice(0, 3).join(', ')})`);
     }
 
     return deals.sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
   }
 }
+

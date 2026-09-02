@@ -76,7 +76,7 @@ export async function initDatabase(): Promise<void> {
         keywords TEXT,
         min_discount NUMERIC NOT NULL DEFAULT 20,
         min_price NUMERIC NOT NULL DEFAULT 15,
-        is_active INTEGER NOT NULL DEFAULT 1,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
         custom_bot_token TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
@@ -106,6 +106,26 @@ export async function initDatabase(): Promise<void> {
         clicked_at TIMESTAMPTZ DEFAULT NOW()
       );
     `);
+
+    // Migração: converte is_active de INTEGER para BOOLEAN (se a coluna ainda for integer)
+    try {
+      const colType = await client.query(`
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = 'channels' AND column_name = 'is_active'
+      `);
+      if (colType.rows.length > 0 && colType.rows[0].data_type === 'integer') {
+        console.log('🔄 Migrando coluna is_active de INTEGER para BOOLEAN...');
+        await client.query(`
+          ALTER TABLE channels
+          ALTER COLUMN is_active DROP DEFAULT,
+          ALTER COLUMN is_active TYPE BOOLEAN USING (is_active = 1),
+          ALTER COLUMN is_active SET DEFAULT TRUE
+        `);
+        console.log('✅ Migração is_active concluída com sucesso!');
+      }
+    } catch (migErr: any) {
+      console.warn('⚠️ Migração is_active ignorada (pode já estar em BOOLEAN):', migErr.message);
+    }
 
     // Índices para performance
     await client.query(`
@@ -240,7 +260,9 @@ export const dbService = {
           isActive: true
         });
       }
-    } catch {}
+    } catch (err: any) {
+      console.warn('⚠️ Erro ao garantir canal padrão:', err.message);
+    }
   },
 
   async getChannels(): Promise<ChannelConfig[]> {
@@ -251,7 +273,7 @@ export const dbService = {
 
   async getActiveChannels(): Promise<ChannelConfig[]> {
     await this.ensureDefaultChannel();
-    const result = await pool.query('SELECT * FROM channels WHERE is_active = 1 ORDER BY created_at DESC');
+    const result = await pool.query('SELECT * FROM channels WHERE is_active = TRUE ORDER BY created_at DESC');
     return result.rows.map((r: any) => this._mapChannel(r));
   },
 
@@ -284,7 +306,7 @@ export const dbService = {
         channel.keywords ? JSON.stringify(channel.keywords) : '[]',
         channel.minDiscountPercent || 20,
         channel.minPrice || 15,
-        channel.isActive ? 1 : 0,
+        Boolean(channel.isActive),
         channel.customBotToken || null
       ]
     );
@@ -393,7 +415,7 @@ export const dbService = {
       pool.query("SELECT COUNT(*) as today FROM posted_deals WHERE DATE(posted_at) = CURRENT_DATE"),
       pool.query("SELECT COUNT(*) as shopee FROM posted_deals WHERE store = 'shopee'"),
       pool.query("SELECT COUNT(*) as ml FROM posted_deals WHERE store = 'mercadolivre'"),
-      pool.query('SELECT COUNT(*) as total FROM channels WHERE is_active = 1'),
+      pool.query('SELECT COUNT(*) as total FROM channels WHERE is_active = TRUE'),
       this.getClicksStats()
     ]);
 
@@ -463,7 +485,7 @@ export const dbService = {
       keywords: r.keywords ? JSON.parse(r.keywords) : [],
       minDiscountPercent: parseFloat(r.min_discount),
       minPrice: parseFloat(r.min_price),
-      isActive: r.is_active === 1 || r.is_active === true,
+      isActive: r.is_active === true || r.is_active === 1 || r.is_active === 't',
       customBotToken: r.custom_bot_token || undefined,
       createdAt: r.created_at
     };

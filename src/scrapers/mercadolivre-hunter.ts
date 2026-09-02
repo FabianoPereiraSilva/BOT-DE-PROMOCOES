@@ -185,7 +185,13 @@ export class MercadoLivreHunter {
         const html = await fetchHtml(url);
         const $ = cheerio.load(html);
 
-        const cards = $('.poly-card, .promotion-item, .andes-card, .ui-search-result, .ui-search-layout__item');
+        const cards = $('.poly-card, .promotion-item, .andes-card, .ui-search-result, .ui-search-layout__item, [class*="poly-card"], [class*="promotion-item"]');
+
+        if (cards.length === 0) {
+          console.log(`[ML Hunter] ⚠️ 0 cards encontrados em: ${url.substring(0, 80)}...`);
+        } else {
+          console.log(`[ML Hunter] 📦 ${cards.length} cards encontrados em: ${url.substring(0, 80)}...`);
+        }
 
         cards.each((_, el) => {
           try {
@@ -286,6 +292,12 @@ export class MercadoLivreHunter {
       } catch (err) {
         console.warn(`Erro ao raspar ofertas do Mercado Livre (${url}):`, err);
       }
+    }
+
+    if (deals.length === 0) {
+      console.log(`[ML Hunter] ⚠️ Nenhuma oferta encontrada para categoria "${categoryKey}" (URLs testadas: ${targetUrls.length})`);
+    } else {
+      console.log(`[ML Hunter] ✅ ${deals.length} ofertas encontradas para categoria "${categoryKey}"`);
     }
 
     return deals.sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
