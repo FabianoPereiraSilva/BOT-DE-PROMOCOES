@@ -100,9 +100,28 @@ export class LinkConverter {
   }
 
   /**
-   * Encurta qualquer URL usando TinyURL (gratuito, sem API key)
+   * Encurta uma URL usando is.gd (gratuito, sem API key, links curtos tipo is.gd/xxxxx)
+   * Fallback para TinyURL se is.gd falhar
    */
   static async shortenUrl(url: string): Promise<string> {
+    // Tenta is.gd — gera links bem curtos (ex: https://is.gd/abc123)
+    try {
+      const response = await axios.get(
+        `https://is.gd/create.php?format=simple&url=${encodeURIComponent(url)}`,
+        {
+          timeout: 4000,
+          headers: { 'User-Agent': 'Mozilla/5.0' }
+        }
+      );
+      const shortened = response.data?.trim();
+      if (shortened && shortened.startsWith('http') && !shortened.includes('error')) {
+        return shortened;
+      }
+    } catch {
+      // continua para o próximo serviço
+    }
+
+    // Fallback: TinyURL
     try {
       const response = await axios.get(
         `https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`,
@@ -115,6 +134,8 @@ export class LinkConverter {
     } catch {
       // fallback silencioso
     }
+
+    // Último recurso: retorna a URL original
     return url;
   }
 }
