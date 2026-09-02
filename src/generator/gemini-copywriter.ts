@@ -52,94 +52,126 @@ export class GeminiCopywriter {
   }
 
   /**
-   * Gera uma copy promocional persuasiva e inteligente usando Google Gemini
+   * Gera uma copy promocional persuasiva e inteligente usando Google Gemini com estrutura 100% garantida
    */
   static async generateDealCopy(deal: Deal, channelId?: string): Promise<string> {
     const settings = getSystemSettings();
     const apiKey = settings.geminiApiKey?.trim();
     const isEnabled = settings.geminiAiEnabled !== false;
-
-    // Se Gemini não estiver configurado ou desativado, retorna o template padrão imediatamente
-    if (!apiKey || !isEnabled) {
-      return CopyFormatter.formatTelegram(deal, channelId);
-    }
-
     const buyUrl = CopyFormatter.getBuyUrl(deal, channelId);
     const storeName = deal.store === 'shopee' ? 'Shopee' : 'Mercado Livre';
     const currPriceFormatted = CopyFormatter.formatCurrency(deal.currentPrice);
     const origPriceFormatted = deal.originalPrice ? CopyFormatter.formatCurrency(deal.originalPrice) : null;
     const discountStr = deal.discountPercent ? `${deal.discountPercent}% OFF` : '';
 
-    const prompt = `Você é um copywriter profissional e estrategista de conversão em vendas para canais de promoções no Telegram no Brasil.
-Crie uma mensagem promocional irresistível, moderna e com alto poder de conversão para o Telegram com base no seguinte produto:
+    let aiHook = '';
 
-DADOS DO PRODUTO:
+    // Se Gemini estiver ativado e configurado, busca um gancho persuasivo exclusivo
+    if (apiKey && isEnabled) {
+      const prompt = `Você é um copywriter profissional e estrategista de vendas de e-commerce brasileiro.
+Escreva um gancho de vendas curto (1 ou 2 frases empolgantes com emojis) destacando o principal benefício e desejo de compra deste produto:
+- Produto: "${deal.title}"
 - Loja: ${storeName}
-- Título do Produto: ${deal.title}
-- Preço Atual Promocional: ${currPriceFormatted}
-- Preço Original Riscado: ${origPriceFormatted || 'Não informado'}
-- Desconto: ${discountStr || 'Preço Especial'}
-- Frete Grátis: ${deal.freeShipping ? 'Sim' : 'Não'}
-- Cupom: ${deal.couponCode || 'Nenhum'}
-- Link de Compra: ${buyUrl}
+- Preço com Desconto: ${currPriceFormatted} (${discountStr})
 
-REGRAS ESTREITAS DE FORMATAÇÃO DO TELEGRAM:
-1. Responda APENAS com o texto da copy pronta para envio no Telegram.
-2. Use EXCLUSIVAMENTE formatação HTML suportada pelo Telegram (<b>texto em negrito</b>, <i>texto em itálico</i>, <s>texto riscado</s>, <code>código/cupom</code>, <a href="${buyUrl}">link</a>). NUNCA use markdown como ** ou __.
-3. ESTRUTURA OBRIGATÓRIA:
-   - Linha 1: Headline de atenção chamativa com emojis (ex: 🚨 <b>OFERTA IMPERDÍVEL NA ${storeName.toUpperCase()}!</b> 🚨)
-   - Linha 2 em branco
-   - Linha 3: 📦 <b>${deal.title}</b>
-   - Linha 4: 1 ou 2 frases curtas com o benefício real do produto que desperta desejo de compra imediata.
-   - Linha 5 em branco
-   - Bloco de Preço:
-     ${origPriceFormatted ? `❌ De: <s>${origPriceFormatted}</s>\n` : ''}🔥 <b>Por: ${currPriceFormatted}</b>${deal.discountPercent ? ` (${deal.discountPercent}% de desconto!)` : ''}
-   - Destaques (se frete grátis: 🚚 <i>Frete Grátis Disponível</i>; se cupom: 🎟️ <i>Cupom:</i> <code>${deal.couponCode || ''}</code>)
-   - Linha em branco
-   - CTA (Chamada para Ação):
-     🛒 <b>Compre com Desconto Seguro:</b>
-     👉 <a href="${buyUrl}">${buyUrl}</a>
-   - Linha em branco
-   - Aviso de urgência: <i>⚡ O preço e o estoque podem mudar a qualquer momento!</i>
-   - Hashtags temáticas do nicho e da loja (#${deal.store === 'shopee' ? 'Shopee' : 'MercadoLivre'} #Promoção #Ofertas)
-4. Mantenha o texto limpo, sem caracteres estranhos e com espaçamento harmônico.`;
+Instruções:
+- Seja persuasivo, dinâmico e direto ao ponto.
+- Responda APENAS com a frase do benefício em texto puro, sem aspas e sem markdown.`;
 
-    for (const model of this.MODELS) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-        const response = await axios.post(
-          url,
-          {
-            contents: [
-              {
-                parts: [{ text: prompt }]
+      for (const model of this.MODELS) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+          const response = await axios.post(
+            url,
+            {
+              contents: [
+                {
+                  parts: [{ text: prompt }]
+                }
+              ],
+              generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 150
               }
-            ],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 600
-            }
-          },
-          { timeout: 7000 }
-        );
+            },
+            { timeout: 8000 }
+          );
 
-        const candidates = response.data?.candidates;
-        const generatedText = candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-        if (generatedText && generatedText.length > 30) {
-          // Garante que o link de afiliado esteja presente no texto gerado
-          let finalText = generatedText;
-          if (!finalText.includes(buyUrl)) {
-            finalText += `\n\n🛒 <b>Compre Aqui:</b> <a href="${buyUrl}">${buyUrl}</a>`;
+          const generatedText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (generatedText && generatedText.length >= 10 && !generatedText.toLowerCase().includes('erro')) {
+            // Remove aspas ou formatações indesejadas
+            aiHook = generatedText.replace(/^["']|["']$/g, '').trim();
+            break;
           }
-          return finalText;
+        } catch {
+          // Tenta o próximo modelo
         }
-      } catch (err: any) {
-        console.warn(`[Gemini AI] Falha ao gerar com modelo ${model}:`, err.response?.data?.error?.message || err.message);
       }
     }
 
-    // Fallback gracioso para template padrão
-    return CopyFormatter.formatTelegram(deal, channelId);
+    // Monta a estrutura 100% blindada e garantida
+    const lines: string[] = [];
+
+    // 1. Header de Atenção
+    lines.push(`🚨 <b>OFERTA IMPERDÍVEL NA ${storeName.toUpperCase()}!</b> 🚨`);
+    lines.push('');
+
+    // 2. Título Oficial do Produto
+    lines.push(`📦 <b>${this.escapeHtml(deal.title)}</b>`);
+
+    // 3. Gancho / Benefício Persuasivo gerado por IA
+    if (aiHook) {
+      lines.push('');
+      lines.push(`💡 <i>${this.escapeHtml(aiHook)}</i>`);
+    }
+
+    // 4. Bloco de Preço (100% garantido com DE e POR)
+    lines.push('');
+    if (origPriceFormatted && deal.discountPercent) {
+      lines.push(`❌ De: <s>${origPriceFormatted}</s>`);
+      lines.push(`🔥 <b>Por: ${currPriceFormatted}</b> (${deal.discountPercent}% de desconto!)`);
+    } else if (origPriceFormatted) {
+      lines.push(`❌ De: <s>${origPriceFormatted}</s>`);
+      lines.push(`🔥 <b>Por: ${currPriceFormatted}</b>`);
+    } else if (deal.discountPercent) {
+      lines.push(`🔥 <b>Por: ${currPriceFormatted}</b> (${deal.discountPercent}% de desconto!)`);
+    } else {
+      lines.push(`🔥 <b>Por apenas: ${currPriceFormatted}</b>`);
+    }
+
+    // 5. Destaques (Frete Grátis, Parcelamento, Cupons)
+    const highlights: string[] = [];
+    if (deal.freeShipping) {
+      highlights.push('🚚 <i>Frete Grátis Disponível</i>');
+    }
+    if (deal.installments) {
+      highlights.push(`💳 <i>${this.escapeHtml(deal.installments)}</i>`);
+    }
+    if (deal.couponCode) {
+      highlights.push(`🎟️ <i>Cupom:</i> <code>${this.escapeHtml(deal.couponCode)}</code>`);
+    }
+
+    if (highlights.length > 0) {
+      lines.push('');
+      lines.push(...highlights);
+    }
+
+    // 6. Chamada para Ação com Link de Afiliado
+    lines.push('');
+    lines.push(`🛒 <b>Compre com Desconto Seguro:</b>`);
+    lines.push(`👉 <a href="${buyUrl}">${buyUrl}</a>`);
+    lines.push('');
+    lines.push(`<i>⚡ O preço e o estoque podem mudar a qualquer momento!</i>`);
+    lines.push('');
+    lines.push(`#${deal.store === 'shopee' ? 'Shopee' : 'MercadoLivre'} #Promoção #Ofertas #Desconto`);
+
+    return lines.join('\n');
+  }
+
+  private static escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 }
