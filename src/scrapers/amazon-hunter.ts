@@ -208,51 +208,154 @@ export class AmazonHunter {
     return isNaN(val) ? null : val;
   }
 
+  private static readonly CATEGORY_SEARCH_MAP: Record<string, string[]> = {
+    esportes_suplementos: ['creatina', 'whey protein', 'tenis corrida', 'suplementos'],
+    eletronicos_tech: ['fone bluetooth', 'smartwatch', 'smartphone', 'echo alexa'],
+    casa_cozinha: ['air fryer', 'cafeteira', 'panela eletrica', 'aspirador robo'],
+    moda_beleza: ['perfume importado', 'skincare', 'relogio masculino', 'hidratante cerave'],
+    games_informatica: ['mouse gamer', 'teclado mecanico', 'ssd nvme', 'headset gamer'],
+    geral: ['mais vendidos', 'ofertas do dia']
+  };
+
   /**
-   * Busca ofertas e produtos em destaque na Amazon Brasil
+   * Busca ofertas e produtos em destaque na Amazon Brasil por categoria, busca ou palavras-chave
    */
-  static async huntDeals(categoryKey?: string): Promise<Deal[]> {
+  static async huntDeals(
+    minDiscount = 10,
+    minPrice = 15,
+    categoryKey = 'geral',
+    customKeywords: string[] = [],
+    searchQuery?: string
+  ): Promise<Deal[]> {
     const deals: Deal[] = [];
-    const url = 'https://www.amazon.com.br/bestsellers';
+    const targetQueries: string[] = [];
 
-    try {
-      const html = await fetchHtml(url);
-      const $ = cheerio.load(html);
+    // Se houver busca direta por termo (ex: "Nike", "Apple", "Creatina")
+    if (searchQuery && searchQuery.trim().length > 0) {
+      targetQueries.push(searchQuery.trim());
+    } else {
+      const keywords = customKeywords.length > 0 ? customKeywords : (this.CATEGORY_SEARCH_MAP[categoryKey] || ['ofertas']);
+      targetQueries.push(...keywords.slice(0, 2));
+    }
 
-      const items = $('.zg-grid-general-faceout, .p13n-sc-uncoverable-faceout, #gridItemRoot, [data-asin]');
+    for (const q of targetQueries) {
+      try {
+        const searchUrl = `https://www.amazon.com.br/s?k=${encodeURIComponent(q)}`;
+        const html = await fetchHtml(searchUrl);
+        if (!html) continue;
 
-      items.each((_, el) => {
-        try {
-          const item = $(el);
-          const asin = item.attr('data-asin') || item.find('[data-asin]').attr('data-asin');
-          const title = item.find('.p13n-sc-truncate-desktop-type2, ._cDEzb_p13n-sc-css-line-clamp-1_1Fn1y, ._cDEzb_p13n-sc-css-line-clamp-2_EW2cb, a.a-link-normal span').first().text().trim();
-          const img = item.find('img').attr('src') || '';
-          const priceRaw = item.find('._cDEzb_p13n-sc-price_3mJ9Z, .a-price .a-offscreen, .p13n-sc-price').first().text().trim();
-          const price = this.parsePrice(priceRaw);
+        const $ = cheerio.load(html);
+        const items = $('[data-asin]');
 
-          let link = item.find('a.a-link-normal').first().attr('href') || '';
-          if (link && !link.startsWith('http')) {
-            link = `https://www.amazon.com.br${link}`;
-          }
+        items.each((_, el) => {
+          try {
+            const item = $(el);
+            const asin = item.attr('data-asin');
+            if (!asin || asin.length !== 10) return;
 
-          if (title && price && price > 0 && link) {
-            const id = asin ? `amz_${asin}` : `amz_${crypto.createHash('md5').update(title).digest('hex').substring(0, 10)}`;
+            // Título completo (combina marca e descrição se divididos em spans)
+            let title = '';
+            const spans = item.find('h2 span');
+            if (spans.length > 1) {
+              title = spans.map((_, s) => $(s).text().trim()).get().filter(Boolean).join(' - ');
+            } else {
+              title = item.find('h2 a span, h2 span, .a-size-base-plus, .a-text-normal').first().text().trim() || item.find('h2').text().trim();
+            }
+            title = title.replace(/\s+/g, ' ').trim();
+            if (!title || title.length < 5) return;
+
+            // Imagem
+            const img = item.find('img.s-image').attr('src') || item.find('img').first().attr('src') || '';
+
+            // Preço Atual
+            let currentPriceStr = item.find('.a-price:not(.a-text-price) .a-offscreen').first().text().trim();
+            if (!currentPriceStr) {
+              currentPriceStr = item.find('.a-price .a-offscreen').first().text().trim();
+            }
+            const currentPrice = this.parsePrice(currentPriceStr);
+            if (!currentPrice || currentPrice < minPrice) return;
+
+            // Preço Original Riscado
+            const origPriceStr = item.find('.a-text-price .a-offscreen, .a-price.a-text-price .a-offscreen').first().text().trim();
+            const originalPrice = this.parsePrice(origPriceStr) || undefined;
+
+            let discountPercent: number | undefined;
+            if (originalPrice && originalPrice > currentPrice) {
+              discountPercent = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+            }
+
+            // Link
+            let link = item.find('h2 a.a-link-normal').attr('href') || item.find('a.a-link-normal').first().attr('href') || '';
+            if (!link) {
+              link = `https://www.amazon.com.br/dp/${asin}`;
+            } else if (!link.startsWith('http')) {
+              link = `https://www.amazon.com.br${link}`;
+            }
+
+            const hasPrime = item.find('i.a-icon-prime, span:contains("Prime"), span:contains("GRÁTIS")').length > 0;
+
             deals.push({
-              id,
+              id: `amz_${asin}`,
               store: 'amazon',
-              category: categoryKey || 'geral',
+              category: categoryKey,
               title,
-              currentPrice: price,
+              originalPrice: originalPrice && originalPrice > currentPrice ? originalPrice : undefined,
+              currentPrice,
+              discountPercent,
               imageUrl: img,
               originalUrl: link,
               affiliateUrl: LinkConverter.convertAmazon(link),
-              freeShipping: true
+              freeShipping: hasPrime
             });
-          }
-        } catch {}
-      });
-    } catch (err: any) {
-      console.warn('[Amazon Hunter] Falha ao buscar lista:', err.message);
+          } catch {}
+        });
+
+        if (deals.length >= 15) break;
+      } catch (err: any) {
+        console.warn(`[Amazon Hunter] Falha ao buscar "${q}":`, err.message);
+      }
+    }
+
+    // Se a busca por termos não retornou nada, tenta bestsellers
+    if (deals.length === 0) {
+      try {
+        const html = await fetchHtml('https://www.amazon.com.br/bestsellers');
+        if (html) {
+          const $ = cheerio.load(html);
+          const items = $('.zg-grid-general-faceout, .p13n-sc-uncoverable-faceout, #gridItemRoot, [data-asin]');
+
+          items.each((_, el) => {
+            try {
+              const item = $(el);
+              const asin = item.attr('data-asin') || item.find('[data-asin]').attr('data-asin');
+              const title = item.find('.p13n-sc-truncate-desktop-type2, ._cDEzb_p13n-sc-css-line-clamp-1_1Fn1y, a.a-link-normal span').first().text().trim();
+              const img = item.find('img').attr('src') || '';
+              const priceRaw = item.find('._cDEzb_p13n-sc-price_3mJ9Z, .a-price .a-offscreen, .p13n-sc-price').first().text().trim();
+              const price = this.parsePrice(priceRaw);
+
+              let link = item.find('a.a-link-normal').first().attr('href') || '';
+              if (link && !link.startsWith('http')) {
+                link = `https://www.amazon.com.br${link}`;
+              }
+
+              if (title && price && price >= minPrice && link) {
+                const id = asin ? `amz_${asin}` : `amz_${crypto.createHash('md5').update(title).digest('hex').substring(0, 10)}`;
+                deals.push({
+                  id,
+                  store: 'amazon',
+                  category: categoryKey,
+                  title,
+                  currentPrice: price,
+                  imageUrl: img,
+                  originalUrl: link,
+                  affiliateUrl: LinkConverter.convertAmazon(link),
+                  freeShipping: true
+                });
+              }
+            } catch {}
+          });
+        }
+      } catch {}
     }
 
     return deals;

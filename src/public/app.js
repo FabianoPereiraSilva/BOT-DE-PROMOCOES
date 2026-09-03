@@ -597,6 +597,10 @@ function initHunter() {
     document.getElementById('hunter-brand-search-input').value = '';
     loadHunterDeals();
   });
+  const storeFilter = document.getElementById('hunter-store-filter');
+  if (storeFilter) {
+    storeFilter.addEventListener('change', () => loadHunterDeals());
+  }
 
   const searchInput = document.getElementById('hunter-brand-search-input');
   const btnSearch = document.getElementById('btn-search-brand');
@@ -641,25 +645,27 @@ function initHunter() {
 async function loadHunterDeals(customQuery = '') {
   const grid = document.getElementById('hunter-deals-grid');
   const category = document.getElementById('hunter-category-filter').value;
+  const store = document.getElementById('hunter-store-filter')?.value || 'all';
   const searchInput = document.getElementById('hunter-brand-search-input');
   const query = customQuery || searchInput.value.trim();
 
+  const storeText = store === 'amazon' ? 'Amazon Brasil' : store === 'mercadolivre' ? 'Mercado Livre' : store === 'shopee' ? 'Shopee' : 'Amazon, Mercado Livre e Shopee';
   const label = query ? `Marca: "${query}"` : getCategoryLabel(category);
 
   grid.innerHTML = `
     <div class="loading-state" style="grid-column: 1/-1; text-align: center; padding: 40px;">
       <div class="spinner" style="margin: 0 auto 16px;"></div>
-      <p>Varrendo Shopee e Mercado Livre em busca de ofertas (${escapeHtml(label)})...</p>
+      <p>Varrendo ${storeText} em busca das melhores ofertas (${escapeHtml(label)})...</p>
     </div>
   `;
 
   try {
-    const url = `/api/deals/hunter-preview?category=${encodeURIComponent(category)}&query=${encodeURIComponent(query)}`;
+    const url = `/api/deals/hunter-preview?category=${encodeURIComponent(category)}&query=${encodeURIComponent(query)}&store=${encodeURIComponent(store)}`;
     const res = await fetch(url);
     const data = await res.json();
 
     if (!data.success || !data.deals || data.deals.length === 0) {
-      grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); padding: 40px;">Nenhuma oferta encontrada para ${escapeHtml(label)} no momento.</div>`;
+      grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); padding: 40px;">Nenhuma oferta encontrada para ${escapeHtml(label)} em ${storeText}.</div>`;
       return;
     }
 
@@ -668,8 +674,10 @@ async function loadHunterDeals(customQuery = '') {
       const card = document.createElement('div');
       card.className = 'deal-card';
 
-      const storeClass = deal.store === 'shopee' ? 'shopee' : 'mercadolivre';
-      const storeName = deal.store === 'shopee' ? 'SHOPEE' : 'MERCADO LIVRE';
+      const isShopee = deal.store === 'shopee';
+      const isAmazon = deal.store === 'amazon';
+      const storeClass = isShopee ? 'shopee' : isAmazon ? 'amazon' : 'mercadolivre';
+      const storeName = isShopee ? 'SHOPEE' : isAmazon ? 'AMAZON' : 'MERCADO LIVRE';
       const curr = deal.currentPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       const orig = deal.originalPrice ? deal.originalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '';
 
@@ -684,6 +692,7 @@ async function loadHunterDeals(customQuery = '') {
           <div class="deal-card-price-box">
             ${orig ? `<div class="deal-old-price">De: ${orig}</div>` : ''}
             <div class="deal-new-price">Por: ${curr}</div>
+            ${deal.freeShipping ? `<div style="font-size: 0.75rem; color: #10b981; font-weight: 600; margin-top: 4px;">🚚 ${isAmazon ? 'Prime Grátis' : 'Frete Grátis'}</div>` : ''}
           </div>
           <div style="display: flex; gap: 8px;">
             <button class="btn-primary btn-small btn-open-studio" style="flex: 1;">

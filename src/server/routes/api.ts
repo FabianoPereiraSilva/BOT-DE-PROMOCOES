@@ -310,28 +310,48 @@ apiRouter.post('/quick-post/publish', async (req: Request, res: Response) => {
   }
 });
 
-// 10. Visualizar Ofertas Caçadas ao Vivo (Hunter Live Stream por Categoria ou Marca)
+// 10. Visualizar Ofertas Caçadas ao Vivo (Hunter Live Stream por Categoria, Marca e Loja)
 apiRouter.get('/deals/hunter-preview', async (req: Request, res: Response) => {
   const category = (req.query.category as string) || 'geral';
   const query = (req.query.query as string) || '';
+  const store = (req.query.store as string) || 'all';
   const settings = getSystemSettings();
 
   try {
-    const [mlDeals, shopeeDeals] = await Promise.allSettled([
-      MercadoLivreHunter.huntDeals(settings.minDiscountPercent, settings.minPrice, category, [], query),
-      ShopeeHunter.huntDeals(settings.minDiscountPercent, settings.minPrice, category, [], query)
-    ]);
+    const promises: Promise<Deal[]>[] = [];
 
+    if (store === 'all' || store === 'amazon') {
+      promises.push(AmazonHunter.huntDeals(settings.minDiscountPercent, settings.minPrice, category, [], query));
+    }
+    if (store === 'all' || store === 'mercadolivre') {
+      promises.push(MercadoLivreHunter.huntDeals(settings.minDiscountPercent, settings.minPrice, category, [], query));
+    }
+    if (store === 'all' || store === 'shopee') {
+      promises.push(ShopeeHunter.huntDeals(settings.minDiscountPercent, settings.minPrice, category, [], query));
+    }
+
+    const settled = await Promise.allSettled(promises);
     const deals: Deal[] = [];
-    if (mlDeals.status === 'fulfilled') deals.push(...mlDeals.value);
-    if (shopeeDeals.status === 'fulfilled') deals.push(...shopeeDeals.value);
 
-    deals.sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
+    settled.forEach(result => {
+      if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+        deals.push(...result.value);
+      }
+    });
+
+    // Ordenação com destaque para produtos com maior desconto
+    deals.sort((a, b) => {
+      const discA = a.discountPercent || 0;
+      const discB = b.discountPercent || 0;
+      if (discB !== discA) return discB - discA;
+      return b.currentPrice - a.currentPrice;
+    });
 
     res.json({
       success: true,
       category,
       query,
+      store,
       count: deals.length,
       deals
     });

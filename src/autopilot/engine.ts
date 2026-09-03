@@ -162,7 +162,7 @@ export class AutopilotEngine {
         const [mlDeals, shopeeDeals, amazonDeals] = await Promise.allSettled([
           MercadoLivreHunter.huntDeals(minDisc, minP, channel.category, channel.keywords),
           ShopeeHunter.huntDeals(minDisc, minP, channel.category, channel.keywords),
-          AmazonHunter.huntDeals(channel.category)
+          AmazonHunter.huntDeals(minDisc, minP, channel.category, channel.keywords)
         ]);
 
         const channelDeals: Deal[] = [];
