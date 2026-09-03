@@ -1,4 +1,4 @@
-export type StoreSource = 'shopee' | 'mercadolivre';
+export type StoreSource = 'shopee' | 'mercadolivre' | 'amazon';
 
 export interface Deal {
   id: string; // unique hash or store product ID
@@ -71,6 +71,7 @@ export interface SystemSettings {
   geminiAiEnabled?: boolean;
   mlAppId?: string;         // ID do App ML (Portal de Desenvolvedores)
   mlClientSecret?: string;  // Chave Secreta do App ML
+  amazonAffiliateTag?: string; // Tag de Afiliado Amazon (ex: fabianopere0d-20)
 }
 
 export interface AutopilotLog {

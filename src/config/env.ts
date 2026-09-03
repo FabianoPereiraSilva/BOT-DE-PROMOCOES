@@ -41,7 +41,8 @@ export function getSystemSettings(): SystemSettings {
     geminiApiKey: dbService.getSetting('geminiApiKey', process.env.GEMINI_API_KEY || ''),
     geminiAiEnabled: dbService.getSetting('geminiAiEnabled', process.env.GEMINI_AI_ENABLED || 'true') === 'true',
     mlAppId: dbService.getSetting('mlAppId', process.env.ML_APP_ID || ''),
-    mlClientSecret: dbService.getSetting('mlClientSecret', process.env.ML_CLIENT_SECRET || '')
+    mlClientSecret: dbService.getSetting('mlClientSecret', process.env.ML_CLIENT_SECRET || ''),
+    amazonAffiliateTag: dbService.getSetting('amazonAffiliateTag', process.env.AMAZON_AFFILIATE_TAG || 'fabianopere0d-20')
   };
 }
 
@@ -72,6 +73,7 @@ export async function updateSystemSettings(settings: Partial<SystemSettings>): P
   if (settings.geminiAiEnabled !== undefined) ops.push(dbService.setSetting('geminiAiEnabled', settings.geminiAiEnabled ? 'true' : 'false'));
   if (settings.mlAppId !== undefined) ops.push(dbService.setSetting('mlAppId', settings.mlAppId.trim()));
   if (settings.mlClientSecret !== undefined) ops.push(dbService.setSetting('mlClientSecret', settings.mlClientSecret.trim()));
+  if (settings.amazonAffiliateTag !== undefined) ops.push(dbService.setSetting('amazonAffiliateTag', settings.amazonAffiliateTag.trim()));
 
   // Persiste todas as settings em paralelo
   await Promise.all(ops);

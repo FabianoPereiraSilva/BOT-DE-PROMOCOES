@@ -76,9 +76,10 @@ export class BannerGenerator {
 
     // Paleta de cores dinâmica conforme a loja
     const isShopee = deal.store === 'shopee';
-    const primaryColor = isShopee ? '#EE4D2D' : '#FFE600';
-    const primaryTextColor = isShopee ? '#FFFFFF' : '#2D3277';
-    const storeLabel = isShopee ? 'SHOPEE' : 'MERCADO LIVRE';
+    const isAmazon = deal.store === 'amazon';
+    const primaryColor = isShopee ? '#EE4D2D' : isAmazon ? '#FF9900' : '#FFE600';
+    const primaryTextColor = isShopee ? '#FFFFFF' : isAmazon ? '#111827' : '#2D3277';
+    const storeLabel = isShopee ? 'SHOPEE' : isAmazon ? 'AMAZON' : 'MERCADO LIVRE';
 
     const formattedCurrentPrice = CopyFormatter.formatCurrency(deal.currentPrice);
     const formattedOriginalPrice = deal.originalPrice ? CopyFormatter.formatCurrency(deal.originalPrice) : null;

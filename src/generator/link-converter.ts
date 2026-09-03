@@ -98,4 +98,34 @@ export class LinkConverter {
 
     return response.data?.data?.generateShortLink?.shortLink || null;
   }
+
+  /**
+   * Converte um link de produto da Amazon em link de afiliado oficial
+   * Suporta amazon.com.br/dp/ASIN, amzn.to, etc.
+   */
+  static convertAmazon(originalUrl: string): string {
+    const settings = getSystemSettings();
+    const tag = (settings.amazonAffiliateTag || 'fabianopere0d-20').trim();
+
+    try {
+      // Extrair ASIN (10 caracteres alfanuméricos padrão Amazon)
+      const asinMatch = originalUrl.match(/(?:\/dp\/|\/gp\/product\/|\/product\/|\/d\/)([A-Z0-9]{10})/i);
+      if (asinMatch && asinMatch[1]) {
+        const asin = asinMatch[1].toUpperCase();
+        return `https://www.amazon.com.br/dp/${asin}?tag=${tag}`;
+      }
+
+      // Se for uma URL completa da Amazon sem ASIN simples no caminho, injeta ou substitui tag
+      const urlObj = new URL(originalUrl);
+      urlObj.searchParams.delete('tag');
+      urlObj.searchParams.delete('ascsubtag');
+      urlObj.searchParams.delete('ref');
+      urlObj.searchParams.delete('ref_');
+      urlObj.searchParams.delete('linkCode');
+      urlObj.searchParams.set('tag', tag);
+      return urlObj.toString();
+    } catch {
+      return originalUrl;
+    }
+  }
 }

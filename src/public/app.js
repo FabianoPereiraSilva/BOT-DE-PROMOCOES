@@ -133,7 +133,7 @@ async function fetchAnalytics() {
       data.topDeals.forEach((deal, idx) => {
         const tr = document.createElement('tr');
         const posBadge = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `#${idx + 1}`));
-        const storeBadge = deal.store === 'shopee' ? '<span class="badge shopee">Shopee</span>' : '<span class="badge mercadolivre">Mercado Livre</span>';
+        const storeBadge = deal.store === 'shopee' ? '<span class="badge shopee">Shopee</span>' : deal.store === 'amazon' ? '<span class="badge amazon">Amazon</span>' : '<span class="badge mercadolivre">Mercado Livre</span>';
         const price = deal.currentPrice ? deal.currentPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-';
         const lastClick = deal.lastClickedAt ? new Date(deal.lastClickedAt).toLocaleString('pt-BR') : '-';
 
@@ -536,7 +536,7 @@ function openDealInStudio(deal, customCopy) {
 
 function displayDealPreview(deal, copyText) {
   const badge = document.getElementById('preview-store-badge');
-  badge.textContent = deal.store === 'shopee' ? 'SHOPEE' : 'MERCADO LIVRE';
+  badge.textContent = deal.store === 'shopee' ? 'SHOPEE' : deal.store === 'amazon' ? 'AMAZON' : 'MERCADO LIVRE';
   badge.className = `badge ${deal.store}`;
 
   document.getElementById('edit-current-price').value = deal.currentPrice;
@@ -562,7 +562,9 @@ function updateProductImagePreview(deal) {
 }
 
 function updateTelegramCaptionPreview(deal) {
-  const storeName = deal.store === 'shopee' ? 'SHOPEE' : 'MERCADO LIVRE';
+  const isShopee = deal.store === 'shopee';
+  const isAmazon = deal.store === 'amazon';
+  const storeName = isShopee ? 'SHOPEE' : isAmazon ? 'AMAZON' : 'MERCADO LIVRE';
   const curr = deal.currentPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const orig = deal.originalPrice ? deal.originalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : null;
 
@@ -575,7 +577,9 @@ function updateTelegramCaptionPreview(deal) {
     text += `🔥 <b>Por apenas: ${curr}</b>\n`;
   }
 
-  if (deal.freeShipping) text += `\n🚚 <i>Frete Grátis Disponível</i>`;
+  if (deal.freeShipping) {
+    text += isAmazon ? `\n🚚 <i>Frete Grátis com Prime</i>` : `\n🚚 <i>Frete Grátis Disponível</i>`;
+  }
   if (deal.couponCode) text += `\n🎟️ <i>Use o Cupom:</i> <code>${deal.couponCode}</code>`;
 
   const displayUrl = deal.affiliateUrl;
@@ -749,7 +753,7 @@ async function fetchHistory() {
     tbody.innerHTML = '';
     data.deals.forEach(item => {
       const tr = document.createElement('tr');
-      const storeBadge = item.store === 'shopee' ? '<span class="badge shopee">Shopee</span>' : '<span class="badge mercadolivre">Mercado Livre</span>';
+      const storeBadge = item.store === 'shopee' ? '<span class="badge shopee">Shopee</span>' : item.store === 'amazon' ? '<span class="badge amazon">Amazon</span>' : '<span class="badge mercadolivre">Mercado Livre</span>';
       const orig = item.original_price ? item.original_price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '-';
       const curr = item.current_price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       const disc = item.discount_percent ? `<span style="color: var(--accent-rose); font-weight: bold;">-${item.discount_percent}%</span>` : '-';
@@ -865,6 +869,7 @@ function initSettings() {
       telegramBotToken: tokenInput.value.trim(),
       telegramChatId: document.getElementById('setting-tg-chat').value.trim(),
       mercadolivreAffiliateTag: document.getElementById('setting-ml-tag').value.trim(),
+      amazonAffiliateTag: document.getElementById('setting-amazon-tag')?.value.trim() || '',
       shopeeAppId: document.getElementById('setting-shopee-appid').value.trim(),
       shopeeSecret: document.getElementById('setting-shopee-secret').value.trim(),
       autopilotEnabled: document.getElementById('setting-autopilot-enabled').checked,
@@ -910,6 +915,9 @@ async function fetchSettings() {
       if (s.telegramBotToken) document.getElementById('setting-tg-token').value = s.telegramBotToken;
       document.getElementById('setting-tg-chat').value = s.telegramChatId || '';
       document.getElementById('setting-ml-tag').value = s.mercadolivreAffiliateTag || '';
+      if (document.getElementById('setting-amazon-tag')) {
+        document.getElementById('setting-amazon-tag').value = s.amazonAffiliateTag || '';
+      }
       document.getElementById('setting-shopee-appid').value = s.shopeeAppId || '';
       document.getElementById('setting-shopee-secret').value = s.shopeeSecret || '';
       document.getElementById('setting-autopilot-enabled').checked = s.autopilotEnabled;

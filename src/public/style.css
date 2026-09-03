@@ -418,6 +418,7 @@ h1, h2, h3, h4, .brand-text h1, .stat-value {
 
 .badge.shopee { background: rgba(238, 77, 45, 0.2); color: #ff6b4a; border: 1px solid rgba(238, 77, 45, 0.3); }
 .badge.mercadolivre { background: rgba(255, 230, 0, 0.2); color: #ffe600; border: 1px solid rgba(255, 230, 0, 0.3); }
+.badge.amazon { background: rgba(255, 153, 0, 0.2); color: #ff9900; border: 1px solid rgba(255, 153, 0, 0.4); }
 
 .tag-status {
   background: rgba(16, 185, 129, 0.15);

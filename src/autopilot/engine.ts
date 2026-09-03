@@ -2,6 +2,7 @@ import { getSystemSettings } from '../config/env.js';
 import { dbService } from '../database/db.js';
 import { MercadoLivreHunter } from '../scrapers/mercadolivre-hunter.js';
 import { ShopeeHunter } from '../scrapers/shopee-hunter.js';
+import { AmazonHunter } from '../scrapers/amazon-hunter.js';
 import { TelegramPublisher } from '../publishers/telegram.js';
 import { ChannelConfig, Deal } from '../types/deal.js';
 
@@ -158,14 +159,16 @@ export class AutopilotEngine {
         const minP = channel.minPrice || settings.minPrice;
 
         // Caça ofertas específicas do nicho do canal
-        const [mlDeals, shopeeDeals] = await Promise.allSettled([
+        const [mlDeals, shopeeDeals, amazonDeals] = await Promise.allSettled([
           MercadoLivreHunter.huntDeals(minDisc, minP, channel.category, channel.keywords),
-          ShopeeHunter.huntDeals(minDisc, minP, channel.category, channel.keywords)
+          ShopeeHunter.huntDeals(minDisc, minP, channel.category, channel.keywords),
+          AmazonHunter.huntDeals(channel.category)
         ]);
 
         const channelDeals: Deal[] = [];
         if (mlDeals.status === 'fulfilled') channelDeals.push(...mlDeals.value);
         if (shopeeDeals.status === 'fulfilled') channelDeals.push(...shopeeDeals.value);
+        if (amazonDeals.status === 'fulfilled') channelDeals.push(...amazonDeals.value);
 
         totalDealsFound += channelDeals.length;
 

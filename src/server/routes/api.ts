@@ -3,6 +3,7 @@ import { getSystemSettings, updateSystemSettings } from '../../config/env.js';
 import { dbService } from '../../database/db.js';
 import { MercadoLivreHunter } from '../../scrapers/mercadolivre-hunter.js';
 import { ShopeeHunter } from '../../scrapers/shopee-hunter.js';
+import { AmazonHunter } from '../../scrapers/amazon-hunter.js';
 import { TelegramPublisher } from '../../publishers/telegram.js';
 import { BannerGenerator } from '../../generator/banner-generator.js';
 import { CopyFormatter } from '../../generator/copy-formatter.js';
@@ -183,10 +184,12 @@ apiRouter.post('/quick-post/extract', async (req: Request, res: Response) => {
       deal = await MercadoLivreHunter.extractProductFromUrl(url);
     } else if (url.includes('shopee.com.br') || url.includes('shp.ee')) {
       deal = await ShopeeHunter.extractProductFromUrl(url);
+    } else if (url.includes('amazon.com') || url.includes('amzn.to') || url.includes('a.co')) {
+      deal = await AmazonHunter.extractProductFromUrl(url);
     } else {
       return res.status(400).json({
         success: false,
-        error: 'Link inválido. Insira um link válido da Shopee ou Mercado Livre.'
+        error: 'Link inválido. Insira um link válido da Amazon, Mercado Livre ou Shopee.'
       });
     }
 

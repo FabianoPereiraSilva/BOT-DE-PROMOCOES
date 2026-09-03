@@ -104,7 +104,7 @@
         <div class="glass-card input-hero-card">
           <div class="card-header">
             <h2>🚀 Postagem Rápida & Gerador de Banner</h2>
-            <p>Cole qualquer link de produto da Shopee ou Mercado Livre para converter o link de afiliado, gerar o banner e publicar no canal desejado.</p>
+            <p>Cole qualquer link de produto da Amazon, Mercado Livre ou Shopee para converter o link de afiliado, gerar a arte e publicar no canal desejado.</p>
           </div>
 
           <form id="quick-post-form" class="url-input-group">
@@ -113,7 +113,7 @@
               <input 
                 type="url" 
                 id="product-url-input" 
-                placeholder="Cole o link do produto aqui (ex: https://shopee.com.br/... ou https://produto.mercadolivre.com.br/...)" 
+                placeholder="Cole o link do produto aqui (Amazon, Mercado Livre ou Shopee)..." 
                 required
               >
             </div>
@@ -598,6 +598,12 @@
                 <label for="setting-ml-tag">Tag de Afiliado Mercado Livre (matt_tool ou código):</label>
                 <input type="text" id="setting-ml-tag" placeholder="Ex: matt_tool=12345678&matt_word=promo">
                 <small>Insira seu código de afiliado do Mercado Livre para ser anexado automaticamente.</small>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="setting-amazon-tag">📦 Tag de Afiliado Amazon Brasil (Tracking ID):</label>
+                <input type="text" id="setting-amazon-tag" placeholder="Ex: fabianopere0d-20">
+                <small>Insira seu ID de associado Amazon (ex: <code>fabianopere0d-20</code>) para comissionamento automático em compras.</small>
               </div>
 
               <div class="form-group">

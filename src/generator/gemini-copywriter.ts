@@ -59,7 +59,7 @@ export class GeminiCopywriter {
     const apiKey = settings.geminiApiKey?.trim();
     const isEnabled = settings.geminiAiEnabled !== false;
     const buyUrl = CopyFormatter.getBuyUrl(deal, channelId);
-    const storeName = deal.store === 'shopee' ? 'Shopee' : 'Mercado Livre';
+    const storeName = deal.store === 'shopee' ? 'Shopee' : deal.store === 'amazon' ? 'Amazon' : 'Mercado Livre';
     const currPriceFormatted = CopyFormatter.formatCurrency(deal.currentPrice);
     const origPriceFormatted = deal.originalPrice ? CopyFormatter.formatCurrency(deal.originalPrice) : null;
     const discountStr = deal.discountPercent ? `${deal.discountPercent}% OFF` : '';
@@ -138,7 +138,7 @@ Instruções:
     // 5. Destaques (Frete Grátis, Parcelamento, Cupons)
     const highlights: string[] = [];
     if (deal.freeShipping) {
-      highlights.push('🚚 <i>Frete Grátis Disponível</i>');
+      highlights.push(deal.store === 'amazon' ? '🚚 <i>Frete Grátis com Prime</i>' : '🚚 <i>Frete Grátis Disponível</i>');
     }
     if (deal.installments) {
       highlights.push(`💳 <i>${this.escapeHtml(deal.installments)}</i>`);
@@ -159,7 +159,8 @@ Instruções:
     lines.push('');
     lines.push(`<i>⚡ O preço e o estoque podem mudar a qualquer momento!</i>`);
     lines.push('');
-    lines.push(`#${deal.store === 'shopee' ? 'Shopee' : 'MercadoLivre'} #Promoção #Ofertas #Desconto`);
+    const storeTag = deal.store === 'shopee' ? 'Shopee' : deal.store === 'amazon' ? 'Amazon' : 'MercadoLivre';
+    lines.push(`#${storeTag} #Promoção #Ofertas #Desconto`);
 
     return lines.join('\n');
   }
