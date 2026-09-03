@@ -242,7 +242,7 @@ apiRouter.post('/quick-post/preview-banner', async (req: Request, res: Response)
 // 9. Publicar Oferta Manualmente (Quick Post para 1 ou múltiplos canais)
 apiRouter.post('/quick-post/publish', async (req: Request, res: Response) => {
   try {
-    const { deal, targetChatId, channelId } = req.body;
+    const { deal, targetChatId, channelId, customCaption } = req.body;
     const dealData: Deal = deal || req.body;
 
     if (!dealData || !dealData.title || !dealData.currentPrice) {
@@ -275,7 +275,14 @@ apiRouter.post('/quick-post/publish', async (req: Request, res: Response) => {
       });
     }
 
-    const result = await TelegramPublisher.publishDeal(dealData, undefined, targetChat, customToken);
+    const result = await TelegramPublisher.publishDeal(
+      dealData, 
+      undefined, 
+      targetChat, 
+      customToken, 
+      channelId, 
+      customCaption
+    );
 
     if (result.success) {
       await dbService.recordPostedDeal({

@@ -566,8 +566,7 @@ function updateTelegramCaptionPreview(deal) {
   const curr = deal.currentPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const orig = deal.originalPrice ? deal.originalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : null;
 
-  let text = `🚨 <b>OFERTA IMPERDÍVEL NA ${storeName}!</b> 🚨\n\n`;
-  text += `📦 <b>${deal.title}</b>\n\n`;
+  let text = `📦 <b>${deal.title}</b>\n\n`;
 
   if (orig && deal.discountPercent) {
     text += `❌ De: <s>${orig}</s>\n`;
@@ -579,7 +578,8 @@ function updateTelegramCaptionPreview(deal) {
   if (deal.freeShipping) text += `\n🚚 <i>Frete Grátis Disponível</i>`;
   if (deal.couponCode) text += `\n🎟️ <i>Use o Cupom:</i> <code>${deal.couponCode}</code>`;
 
-  text += `\n\n🛒 <b>Compre com Desconto Seguro:</b>\n👉 <a href="${deal.affiliateUrl}">${deal.affiliateUrl}</a>`;
+  const displayUrl = deal.affiliateUrl;
+  text += `\n\n🛒 <b>Compre com Desconto Seguro:</b>\n👉 <a href="${displayUrl}">${displayUrl}</a>`;
 
   document.getElementById('tg-caption-preview').innerHTML = text;
 }
