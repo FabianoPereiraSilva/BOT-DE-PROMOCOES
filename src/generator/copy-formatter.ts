@@ -1,7 +1,6 @@
 import { Deal } from '../types/deal.js';
 import { getSystemSettings } from '../config/env.js';
 import { GeminiCopywriter } from './gemini-copywriter.js';
-import { LinkConverter } from './link-converter.js';
 
 export class CopyFormatter {
   /**
@@ -43,8 +42,7 @@ export class CopyFormatter {
   static async formatTelegram(deal: Deal, channelId?: string): Promise<string> {
     const settings = getSystemSettings();
     const customTemplate = settings.customCopyTemplate?.trim();
-    const rawUrl = this.getBuyUrl(deal, channelId);
-    const buyUrl = await LinkConverter.shortenUrl(rawUrl);
+    const buyUrl = this.getBuyUrl(deal, channelId);
 
     const storeEmoji = deal.store === 'shopee' ? '🟠' : '🟡';
     const storeName = deal.store === 'shopee' ? 'SHOPEE' : 'MERCADO LIVRE';

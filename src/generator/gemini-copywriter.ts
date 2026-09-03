@@ -2,7 +2,6 @@ import axios from 'axios';
 import { Deal } from '../types/deal.js';
 import { getSystemSettings } from '../config/env.js';
 import { CopyFormatter } from './copy-formatter.js';
-import { LinkConverter } from './link-converter.js';
 
 export class GeminiCopywriter {
   // Lista de modelos suportados por ordem de prioridade
@@ -59,8 +58,7 @@ export class GeminiCopywriter {
     const settings = getSystemSettings();
     const apiKey = settings.geminiApiKey?.trim();
     const isEnabled = settings.geminiAiEnabled !== false;
-    const rawUrl = CopyFormatter.getBuyUrl(deal, channelId);
-    const buyUrl = await LinkConverter.shortenUrl(rawUrl);
+    const buyUrl = CopyFormatter.getBuyUrl(deal, channelId);
     const storeName = deal.store === 'shopee' ? 'Shopee' : 'Mercado Livre';
     const currPriceFormatted = CopyFormatter.formatCurrency(deal.currentPrice);
     const origPriceFormatted = deal.originalPrice ? CopyFormatter.formatCurrency(deal.originalPrice) : null;

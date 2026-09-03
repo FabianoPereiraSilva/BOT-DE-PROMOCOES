@@ -383,21 +383,7 @@ apiRouter.get('/analytics/clicks', async (req: Request, res: Response) => {
   }
 });
 
-// 15. Teste do Encurtador de Links
-apiRouter.get('/test-shorten', async (req: Request, res: Response) => {
-  const testUrl = (req.query.url as string) || 'https://www.mercadolivre.com.br/bicicleta-spinning/p/MLB34219371?matt_tool=43617720&matt_word=pefa86946';
-  try {
-    const shortened = await LinkConverter.shortenUrl(testUrl);
-    res.json({
-      success: true,
-      original: testUrl,
-      shortened,
-      wasShortened: shortened !== testUrl
-    });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+
 
 // 16. Teste da API Oficial do Mercado Livre
 apiRouter.get('/test-ml', async (req: Request, res: Response) => {
