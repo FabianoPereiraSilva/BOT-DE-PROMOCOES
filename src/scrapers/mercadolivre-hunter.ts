@@ -168,9 +168,9 @@ export class MercadoLivreHunter {
     if (searchQuery && searchQuery.trim().length > 0) {
       const cleanQ = searchQuery.trim().toLowerCase();
       const slug = encodeURIComponent(cleanQ).replace(/%20/g, '-');
-      targetUrls.push(`https://lista.mercadolivre.com.br/${slug}_Desconto_${Math.min(minDiscount, 10)}-100`);
-      targetUrls.push(`https://lista.mercadolivre.com.br/${slug}`);
       targetUrls.push(`https://www.mercadolivre.com.br/ofertas?q=${encodeURIComponent(cleanQ)}`);
+      targetUrls.push(`https://lista.mercadolivre.com.br/${slug}`);
+      targetUrls.push(`https://lista.mercadolivre.com.br/${slug}_Desconto_${Math.min(minDiscount, 10)}-100`);
     } else {
       const preset = CATEGORY_PRESETS[categoryKey];
 
@@ -202,9 +202,10 @@ export class MercadoLivreHunter {
     for (const url of targetUrls) {
       try {
         const html = await fetchHtml(url);
+        if (!html || html.length < 500) continue;
         const $ = cheerio.load(html);
 
-        const cards = $('.poly-card, .promotion-item, .andes-card, .ui-search-result, .ui-search-layout__item, [class*="poly-card"], [class*="promotion-item"]');
+        const cards = $('.poly-card, .promotion-item, .andes-card:not(:has(.poly-card)), .ui-search-layout__item:not(:has(.poly-card)), .ui-search-result:not(:has(.poly-card))');
 
         if (cards.length === 0) {
           console.log(`[ML Hunter] ⚠️ 0 cards encontrados em: ${url.substring(0, 80)}...`);
@@ -217,14 +218,14 @@ export class MercadoLivreHunter {
             const card = $(el);
             
             // Link
-            let link = card.find('a.poly-component__title, a.promotion-item__link-container, a.ui-search-link, a.ui-search-item__group__element').attr('href') ||
+            let link = card.find('a.poly-component__title, a.promotion-item__link-container, a.ui-search-link, a.ui-search-item__group__element, h3 a').attr('href') ||
                        card.find('a').first().attr('href');
 
             if (!link || !link.startsWith('http')) return;
             link = link.split('?')[0].split('#')[0];
 
             // Título (suporta cards de ofertas e cards de busca geral do site)
-            const title = card.find('.poly-component__title, .promotion-item__title, .ui-search-item__title, h2, a.ui-search-link').first().text().trim();
+            const title = card.find('.poly-component__title, .promotion-item__title, .ui-search-item__title, h2, h3, a.ui-search-link').first().text().trim();
             if (!title || title.length < 5) return;
 
             // Imagem

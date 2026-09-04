@@ -37,27 +37,11 @@ function getBrowserHeaders(ua: string): Record<string, string> {
 
 export async function fetchHtml(url: string, customHeaders: Record<string, string> = {}): Promise<string> {
   try {
-    const isCrawlerAllowed = url.includes('mercadolivre.com') || 
-                             url.includes('mercadolibre.com') || 
-                             url.includes('meli.la') ||
-                             url.includes('amazon.com') ||
-                             url.includes('amzn.to') ||
-                             url.includes('a.co');
-    const defaultUa = isCrawlerAllowed 
-      ? 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
-      : getRandomUserAgent();
-
-    const headers = isCrawlerAllowed
-      ? {
-          'User-Agent': defaultUa,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'pt-BR,pt;q=0.9',
-          ...customHeaders
-        }
-      : {
-          ...getBrowserHeaders(defaultUa),
-          ...customHeaders
-        };
+    const ua = getRandomUserAgent();
+    const headers = {
+      ...getBrowserHeaders(ua),
+      ...customHeaders
+    };
 
     const response = await axios.get(url, {
       headers,
