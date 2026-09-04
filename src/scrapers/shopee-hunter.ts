@@ -5,6 +5,7 @@ import { Deal } from '../types/deal.js';
 import { fetchHtml, fetchShopeeApi, cleanPrice, getRandomUserAgent } from './base-scraper.js';
 import { LinkConverter } from '../generator/link-converter.js';
 import { CATEGORY_PRESETS } from '../config/categories.js';
+import { getSystemSettings } from '../config/env.js';
 
 export class ShopeeHunter {
   /**
@@ -263,8 +264,115 @@ export class ShopeeHunter {
   }
 
   /**
+   * Caça ofertas oficiais de alto desconto e conversão através da Shopee Affiliate Open API (GraphQL)
+   * 100% oficial, sem bloqueios de scraping/403 e já com links oficiais de afiliado.
+   */
+  private static async huntViaAffiliateApi(
+    minDiscount: number,
+    minPrice: number,
+    categoryKey: string,
+    customKeywords: string[] = [],
+    searchQuery?: string
+  ): Promise<Deal[]> {
+    const settings = getSystemSettings();
+    const appId = settings.shopeeAppId?.trim();
+    const secret = settings.shopeeSecret?.trim();
+
+    if (!appId || !secret) {
+      return [];
+    }
+
+    const deals: Deal[] = [];
+    const preset = CATEGORY_PRESETS[categoryKey];
+
+    let searchKeywords: string[] = [];
+    if (searchQuery && searchQuery.trim().length > 0) {
+      searchKeywords = [searchQuery.trim()];
+    } else if (customKeywords && customKeywords.length > 0) {
+      searchKeywords = customKeywords.slice(0, 3);
+    } else if (preset && categoryKey !== 'geral') {
+      searchKeywords = preset.defaultKeywords.slice(0, 2);
+    } else {
+      // Geral: busca vazia (pega as maiores ofertas gerais do catálogo de afiliados) + ofertas do dia
+      searchKeywords = ['', 'ofertas do dia'];
+    }
+
+    for (const kw of searchKeywords) {
+      try {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const kwParam = kw ? `keyword: "${kw.replace(/"/g, '')}", ` : '';
+        const query = `query { productOfferV2(${kwParam}sortType: 1, page: 1, limit: 30) { nodes { itemId productName productLink offerLink imageUrl priceMin priceMax priceDiscountRate sales ratingStar commissionRate } } }`;
+
+        const payloadStr = JSON.stringify({ query });
+        const factor = `${appId}${timestamp}${payloadStr}${secret}`;
+        const signature = crypto.createHash('sha256').update(factor).digest('hex');
+
+        const response = await axios.post(
+          'https://open-api.affiliate.shopee.com.br/graphql',
+          payloadStr,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `SHA256 Credential=${appId}, Timestamp=${timestamp}, Signature=${signature}`
+            },
+            timeout: 8000
+          }
+        );
+
+        if (response.data?.errors) {
+          console.warn(`[Shopee API] Resposta da API para "${kw || 'geral'}":`, response.data.errors[0]?.message);
+          continue;
+        }
+
+        const nodes = response.data?.data?.productOfferV2?.nodes || [];
+        if (nodes.length > 0) {
+          console.log(`[Shopee API] ✅ ${nodes.length} ofertas retornadas para "${kw || 'geral'}"`);
+        }
+
+        for (const item of nodes) {
+          const currentPrice = parseFloat(item.priceMin || item.priceMax || '0');
+          if (isNaN(currentPrice) || currentPrice < minPrice) continue;
+
+          const discountPercent = item.priceDiscountRate || 0;
+          // Se houver busca por marca/query aceita desconto >= 10 ou o minDiscount solicitado
+          const threshold = searchQuery ? Math.min(minDiscount, 10) : minDiscount;
+          if (threshold > 0 && discountPercent < threshold) continue;
+
+          let originalPrice: number | undefined;
+          if (discountPercent > 0) {
+            originalPrice = Math.round((currentPrice / (1 - discountPercent / 100)) * 100) / 100;
+          }
+
+          const affiliateUrl = item.offerLink || item.productLink;
+
+          deals.push({
+            id: `shopee_${item.itemId}`,
+            store: 'shopee',
+            category: categoryKey,
+            title: item.productName,
+            originalPrice: originalPrice && originalPrice > currentPrice ? originalPrice : undefined,
+            currentPrice,
+            discountPercent: discountPercent > 0 ? discountPercent : undefined,
+            imageUrl: item.imageUrl || '',
+            originalUrl: item.productLink,
+            affiliateUrl,
+            rating: item.ratingStar ? parseFloat(item.ratingStar) : undefined,
+            freeShipping: true
+          });
+        }
+
+        if (deals.length >= 25) break;
+      } catch (err: any) {
+        console.warn(`[Shopee API] Falha na consulta de ofertas "${kw}":`, err.message);
+      }
+    }
+
+    return deals;
+  }
+
+  /**
    * Caçador de Ofertas com alto desconto da Shopee (Geral ou por Categoria/Palavras-chave)
-   * Estratégia: 1) Tenta API v4 com headers anti-bot  2) Fallback: scraping HTML
+   * Estratégia: 1) Shopee Affiliate Open API (GraphQL oficial)  2) Fallback: API v4 / scraping HTML
    */
   static async huntDeals(
     minDiscount = 20, 
@@ -273,6 +381,20 @@ export class ShopeeHunter {
     customKeywords: string[] = [],
     searchQuery?: string
   ): Promise<Deal[]> {
+    // === TENTATIVA 1: API Oficial de Afiliados Shopee (GraphQL) ===
+    try {
+      const apiDeals = await this.huntViaAffiliateApi(minDiscount, minPrice, categoryKey, customKeywords, searchQuery);
+      if (apiDeals.length > 0) {
+        console.log(`[Shopee Hunter] 🎯 ${apiDeals.length} ofertas de alto desconto encontradas via Shopee Affiliate Open API!`);
+        const unique = new Map<string, Deal>();
+        apiDeals.forEach(d => { if (!unique.has(d.id)) unique.set(d.id, d); });
+        return Array.from(unique.values()).sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
+      }
+    } catch (apiErr: any) {
+      console.warn('[Shopee Hunter] Falha ao tentar API Oficial de Afiliados, tentando fallbacks:', apiErr.message);
+    }
+
+    // === TENTATIVA 2: Fallbacks Legados (Scraping) ===
     const deals: Deal[] = [];
     const preset = CATEGORY_PRESETS[categoryKey];
 
