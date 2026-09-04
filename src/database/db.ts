@@ -127,6 +127,15 @@ export async function initDatabase(): Promise<void> {
       console.warn('⚠️ Migração is_active ignorada (pode já estar em BOOLEAN):', migErr.message);
     }
 
+    // Migração: adiciona coluna origin_filter em channels se não existir
+    try {
+      await client.query(`
+        ALTER TABLE channels ADD COLUMN IF NOT EXISTS origin_filter TEXT DEFAULT 'all'
+      `);
+    } catch (migErr: any) {
+      console.warn('⚠️ Migração origin_filter ignorada:', migErr.message);
+    }
+
     // Índices para performance
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_posted_deals_store ON posted_deals(store);
@@ -310,8 +319,8 @@ export const dbService = {
 
   async saveChannel(channel: ChannelConfig): Promise<void> {
     await pool.query(
-      `INSERT INTO channels (id, name, platform, chat_id, category, keywords, min_discount, min_price, is_active, custom_bot_token, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, NOW())
+      `INSERT INTO channels (id, name, platform, chat_id, category, keywords, min_discount, min_price, is_active, custom_bot_token, origin_filter, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, NOW())
        ON CONFLICT (id) DO UPDATE SET
          name = EXCLUDED.name,
          platform = EXCLUDED.platform,
@@ -321,7 +330,8 @@ export const dbService = {
          min_discount = EXCLUDED.min_discount,
          min_price = EXCLUDED.min_price,
          is_active = EXCLUDED.is_active,
-         custom_bot_token = EXCLUDED.custom_bot_token`,
+         custom_bot_token = EXCLUDED.custom_bot_token,
+         origin_filter = EXCLUDED.origin_filter`,
       [
         channel.id,
         channel.name,
@@ -332,7 +342,8 @@ export const dbService = {
         channel.minDiscountPercent || 20,
         channel.minPrice || 15,
         Boolean(channel.isActive),
-        channel.customBotToken || null
+        channel.customBotToken || null,
+        channel.originFilter || 'all'
       ]
     );
   },
@@ -512,6 +523,7 @@ export const dbService = {
       minPrice: parseFloat(r.min_price),
       isActive: r.is_active === true || r.is_active === 1 || r.is_active === 't',
       customBotToken: r.custom_bot_token || undefined,
+      originFilter: r.origin_filter || 'all',
       createdAt: r.created_at
     };
   }

@@ -1,4 +1,5 @@
 export type StoreSource = 'shopee' | 'mercadolivre' | 'amazon';
+export type OriginFilter = 'all' | 'national' | 'international';
 
 export interface Deal {
   id: string; // unique hash or store product ID
@@ -17,6 +18,7 @@ export interface Deal {
   installments?: string;
   category?: string;
   postedAt?: string;
+  isInternational?: boolean;
 }
 
 export interface PostedDealRecord {
@@ -47,6 +49,7 @@ export interface ChannelConfig {
   isActive: boolean;
   customBotToken?: string;
   createdAt?: string;
+  originFilter?: OriginFilter; // 'all' | 'national' | 'international'
 }
 
 export interface SystemSettings {
@@ -72,6 +75,7 @@ export interface SystemSettings {
   mlAppId?: string;         // ID do App ML (Portal de Desenvolvedores)
   mlClientSecret?: string;  // Chave Secreta do App ML
   amazonAffiliateTag?: string; // Tag de Afiliado Amazon (ex: fabianopere0d-20)
+  originFilter?: OriginFilter; // 'all' | 'national' | 'international'
 }
 
 export interface AutopilotLog {

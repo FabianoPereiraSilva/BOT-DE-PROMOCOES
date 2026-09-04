@@ -339,6 +339,15 @@
             </div>
 
             <div class="form-group">
+              <label for="channel-input-origin">Origem das Ofertas para este Canal:</label>
+              <select id="channel-input-origin" class="custom-select">
+                <option value="all">🌐 Todas (Nacionais e Internacionais)</option>
+                <option value="national" selected>🇧🇷 Apenas Nacionais (Sem Imposto)</option>
+                <option value="international">✈️ Apenas Internacionais (Importados)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
               <label for="channel-input-keywords">Palavras-chave Personalizadas (Separadas por vírgula):</label>
               <input type="text" id="channel-input-keywords" placeholder="Ex: creatina, whey, pre treino, garrafa termica">
               <small>Deixe em branco para usar as palavras-chave inteligentes padrão do nicho.</small>
@@ -382,11 +391,16 @@
               <p>Ofertas garimpadas ao vivo na Amazon Brasil, Mercado Livre e Shopee com filtros por nicho, marca e loja.</p>
             </div>
             <div class="hunter-actions">
-              <select id="hunter-store-filter" class="custom-select" style="min-width: 170px;">
+              <select id="hunter-store-filter" class="custom-select" style="min-width: 160px;">
                 <option value="all">🌐 Todas as Lojas</option>
                 <option value="amazon">📦 Amazon Brasil</option>
                 <option value="mercadolivre">🟡 Mercado Livre</option>
                 <option value="shopee">🟠 Shopee</option>
+              </select>
+              <select id="hunter-origin-filter" class="custom-select" style="min-width: 170px;">
+                <option value="all">🌍 Todos (Nac. e Inter.)</option>
+                <option value="national" selected>🇧🇷 Somente Nacionais</option>
+                <option value="international">✈️ Somente Internacionais</option>
               </select>
               <select id="hunter-category-filter" class="custom-select" style="min-width: 220px;">
                 <option value="geral">🔥 Todas as Categorias (Geral)</option>
@@ -534,6 +548,16 @@
                   <option value="geral">🔥 Geral (Todas as Categorias)</option>
                 </select>
                 <small>Define qual nicho o Piloto Automático caçará e postará no canal principal.</small>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="setting-origin-filter">🌍 Filtro de Origem dos Produtos (Nacionais ou Importados):</label>
+                <select id="setting-origin-filter" class="custom-select">
+                  <option value="all">🌐 Todos os Produtos (Nacionais e Internacionais)</option>
+                  <option value="national" selected>🇧🇷 Somente Produtos Nacionais (Sem Taxa de Importação)</option>
+                  <option value="international">✈️ Somente Produtos Internacionais (Importados / China)</option>
+                </select>
+                <small>Troque a qualquer momento. Se marcado como Nacional, o bot descarta ofertas de fora do Brasil.</small>
               </div>
 
               <div class="form-group full-width">

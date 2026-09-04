@@ -315,6 +315,7 @@ apiRouter.get('/deals/hunter-preview', async (req: Request, res: Response) => {
   const category = (req.query.category as string) || 'geral';
   const query = (req.query.query as string) || '';
   const store = (req.query.store as string) || 'all';
+  const origin = (req.query.origin as string) || 'all';
   const settings = getSystemSettings();
 
   try {
@@ -331,13 +332,20 @@ apiRouter.get('/deals/hunter-preview', async (req: Request, res: Response) => {
     }
 
     const settled = await Promise.allSettled(promises);
-    const deals: Deal[] = [];
+    let deals: Deal[] = [];
 
     settled.forEach(result => {
       if (result.status === 'fulfilled' && Array.isArray(result.value)) {
         deals.push(...result.value);
       }
     });
+
+    // Filtro por origem (Nacional vs Internacional)
+    if (origin === 'national') {
+      deals = deals.filter(d => !d.isInternational);
+    } else if (origin === 'international') {
+      deals = deals.filter(d => d.isInternational === true);
+    }
 
     // Ordenação com destaque para produtos com maior desconto
     deals.sort((a, b) => {
@@ -352,6 +360,7 @@ apiRouter.get('/deals/hunter-preview', async (req: Request, res: Response) => {
       category,
       query,
       store,
+      origin,
       count: deals.length,
       deals
     });

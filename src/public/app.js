@@ -214,6 +214,7 @@ function initChannels() {
     const keywords = document.getElementById('channel-input-keywords').value.trim();
     const minDiscountPercent = parseFloat(document.getElementById('channel-input-min-discount').value);
     const customBotToken = document.getElementById('channel-input-token').value.trim();
+    const originFilter = document.getElementById('channel-input-origin')?.value || 'all';
 
     try {
       const res = await fetch('/api/channels', {
@@ -226,7 +227,8 @@ function initChannels() {
           category,
           keywords: keywords ? keywords.split(',').map(k => k.trim()) : [],
           minDiscountPercent,
-          customBotToken: customBotToken || undefined
+          customBotToken: customBotToken || undefined,
+          originFilter
         })
       });
 
@@ -340,6 +342,9 @@ async function fetchChannels() {
           document.getElementById('channel-input-keywords').value = ch.keywords ? ch.keywords.join(', ') : '';
           document.getElementById('channel-input-min-discount').value = ch.minDiscountPercent;
           document.getElementById('channel-input-token').value = ch.customBotToken || '';
+          if (document.getElementById('channel-input-origin')) {
+            document.getElementById('channel-input-origin').value = ch.originFilter || 'all';
+          }
 
           document.getElementById('channel-form-box').classList.remove('hidden');
           document.getElementById('channel-form-box').scrollIntoView({ behavior: 'smooth' });
@@ -609,6 +614,10 @@ function initHunter() {
   if (storeFilter) {
     storeFilter.addEventListener('change', () => loadHunterDeals());
   }
+  const originFilter = document.getElementById('hunter-origin-filter');
+  if (originFilter) {
+    originFilter.addEventListener('change', () => loadHunterDeals());
+  }
 
   const searchInput = document.getElementById('hunter-brand-search-input');
   const btnSearch = document.getElementById('btn-search-brand');
@@ -654,21 +663,23 @@ async function loadHunterDeals(customQuery = '') {
   const grid = document.getElementById('hunter-deals-grid');
   const category = document.getElementById('hunter-category-filter').value;
   const store = document.getElementById('hunter-store-filter')?.value || 'all';
+  const origin = document.getElementById('hunter-origin-filter')?.value || 'national';
   const searchInput = document.getElementById('hunter-brand-search-input');
   const query = customQuery || searchInput.value.trim();
 
   const storeText = store === 'amazon' ? 'Amazon Brasil' : store === 'mercadolivre' ? 'Mercado Livre' : store === 'shopee' ? 'Shopee' : 'Amazon, Mercado Livre e Shopee';
+  const originText = origin === 'national' ? '🇧🇷 Nacionais' : origin === 'international' ? '✈️ Internacionais' : '🌍 Todos';
   const label = query ? `Marca: "${query}"` : getCategoryLabel(category);
 
   grid.innerHTML = `
     <div class="loading-state" style="grid-column: 1/-1; text-align: center; padding: 40px;">
       <div class="spinner" style="margin: 0 auto 16px;"></div>
-      <p>Varrendo ${storeText} em busca das melhores ofertas (${escapeHtml(label)})...</p>
+      <p>Varrendo ${storeText} em busca das melhores ofertas (${escapeHtml(label)} - ${originText})...</p>
     </div>
   `;
 
   try {
-    const url = `/api/deals/hunter-preview?category=${encodeURIComponent(category)}&query=${encodeURIComponent(query)}&store=${encodeURIComponent(store)}`;
+    const url = `/api/deals/hunter-preview?category=${encodeURIComponent(category)}&query=${encodeURIComponent(query)}&store=${encodeURIComponent(store)}&origin=${encodeURIComponent(origin)}`;
     const res = await fetch(url);
     const data = await res.json();
 
@@ -900,7 +911,8 @@ function initSettings() {
       peakHoursOnly: document.getElementById('setting-peak-hours-only')?.checked || false,
       peakHoursRanges: document.getElementById('setting-peak-hours-ranges')?.value.trim() || '07:30-09:30,11:45-14:00,18:30-22:30',
       geminiApiKey: document.getElementById('setting-gemini-key')?.value.trim() || '',
-      geminiAiEnabled: document.getElementById('setting-gemini-enabled')?.checked || false
+      geminiAiEnabled: document.getElementById('setting-gemini-enabled')?.checked || false,
+      originFilter: document.getElementById('setting-origin-filter')?.value || 'all'
     };
 
     try {
@@ -943,6 +955,9 @@ async function fetchSettings() {
       document.getElementById('setting-min-price').value = s.minPrice || 15;
       document.getElementById('setting-dedup-hours').value = s.deduplicationHours || 72;
       if (s.defaultCategory) document.getElementById('setting-default-category').value = s.defaultCategory;
+      if (document.getElementById('setting-origin-filter') && s.originFilter) {
+        document.getElementById('setting-origin-filter').value = s.originFilter;
+      }
       if (s.defaultKeywords && Array.isArray(s.defaultKeywords)) {
         document.getElementById('setting-default-keywords').value = s.defaultKeywords.join(', ');
       }

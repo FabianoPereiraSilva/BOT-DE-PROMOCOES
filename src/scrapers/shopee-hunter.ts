@@ -344,6 +344,13 @@ export class ShopeeHunter {
           }
 
           const affiliateUrl = item.offerLink || item.productLink;
+          const pName = (item.productName || '').toLowerCase();
+          const pLink = (item.productLink || '').toLowerCase();
+          const isInternational = pName.includes('internacional') || 
+                                  pName.includes('importado da china') || 
+                                  pName.includes('envio internacional') ||
+                                  pLink.includes('crossborder') ||
+                                  pLink.includes('-i.');
 
           deals.push({
             id: `shopee_${item.itemId}`,
@@ -357,7 +364,8 @@ export class ShopeeHunter {
             originalUrl: item.productLink,
             affiliateUrl,
             rating: item.ratingStar ? parseFloat(item.ratingStar) : undefined,
-            freeShipping: true
+            freeShipping: true,
+            isInternational
           });
         }
 

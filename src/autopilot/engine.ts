@@ -170,16 +170,28 @@ export class AutopilotEngine {
         if (shopeeDeals.status === 'fulfilled') channelDeals.push(...shopeeDeals.value);
         if (amazonDeals.status === 'fulfilled') channelDeals.push(...amazonDeals.value);
 
-        totalDealsFound += channelDeals.length;
+        // Filtro de Origem (Nacional vs Internacional)
+        const originRule = channel.originFilter || settings.originFilter || 'all';
+        const originFilteredDeals = channelDeals.filter(deal => {
+          if (originRule === 'national') {
+            return !deal.isInternational;
+          }
+          if (originRule === 'international') {
+            return deal.isInternational === true;
+          }
+          return true;
+        });
+
+        totalDealsFound += originFilteredDeals.length;
 
         // Ordena por maior desconto
-        channelDeals.sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
+        originFilteredDeals.sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
 
         // Deduplicação: pré-busca hashes dos posts recentes no banco
         const hoursThreshold = settings.deduplicationHours || 72;
         const recentHashes = await dbService.getRecentPostedHashes(hoursThreshold);
 
-        const freshDeals = channelDeals.filter(deal => {
+        const freshDeals = originFilteredDeals.filter(deal => {
           if (recentHashes.has(`id:${deal.id}`)) return false;
           const cleanUrl = (deal.originalUrl || '').split('?')[0].split('#')[0];
           if (cleanUrl.length > 10 && recentHashes.has(`url:${cleanUrl}`)) return false;

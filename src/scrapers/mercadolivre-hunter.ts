@@ -298,6 +298,14 @@ export class MercadoLivreHunter {
 
             const isFreeShipping = card.find('.poly-component__shipping:contains("grátis"), .promotion-item__shipping:contains("grátis"), span:contains("Frete grátis")').length > 0;
 
+            // Identificação de Produto Internacional no Mercado Livre
+            const cardText = card.text().toLowerCase();
+            const isInternational = cardText.includes('compra internacional') ||
+                                    cardText.includes('envio internacional') ||
+                                    link.includes('cbt') ||
+                                    link.includes('compra-internacional') ||
+                                    card.find('.poly-component__cbt, [class*="cbt"], [class*="international"]').length > 0;
+
             const mlbMatch = link.match(/MLB-?(\d+)/i);
             const id = mlbMatch ? `ml_${mlbMatch[1]}` : `ml_${crypto.createHash('md5').update(title).digest('hex').substring(0, 12)}`;
 
@@ -312,7 +320,8 @@ export class MercadoLivreHunter {
               imageUrl,
               originalUrl: link,
               affiliateUrl: LinkConverter.convertMercadoLivre(link),
-              freeShipping: isFreeShipping
+              freeShipping: isFreeShipping,
+              isInternational
             });
           } catch {
             // Ignora card com erro

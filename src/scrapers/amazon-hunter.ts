@@ -329,6 +329,13 @@ export class AmazonHunter {
 
             const hasPrime = item.find('i.a-icon-prime, span:contains("Prime"), span:contains("GRÁTIS")').length > 0;
 
+            // Identificação de Produto Internacional na Amazon
+            const itemText = item.text().toLowerCase();
+            const isInternational = itemText.includes('enviado de fora do brasil') ||
+                                    itemText.includes('importado') ||
+                                    itemText.includes('tributos de importação') ||
+                                    itemText.includes('compra internacional');
+
             deals.push({
               id: `amz_${asin}`,
               store: 'amazon',
@@ -340,7 +347,8 @@ export class AmazonHunter {
               imageUrl: img,
               originalUrl: link,
               affiliateUrl: LinkConverter.convertAmazon(link),
-              freeShipping: hasPrime
+              freeShipping: hasPrime,
+              isInternational
             });
           } catch {}
         });
