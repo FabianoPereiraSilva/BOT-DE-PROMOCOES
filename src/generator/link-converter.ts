@@ -73,20 +73,15 @@ export class LinkConverter {
    */
   private static async generateShopeeApiShortLink(originUrl: string, appId: string, secret: string): Promise<string | null> {
     const timestamp = Math.floor(Date.now() / 1000);
-    const query = `
-      mutation {
-        generateShortLink(input: { originUrl: "${originUrl}", subIds: ["bot_auto"] }) {
-          shortLink
-        }
-      }
-    `;
+    const query = `mutation { generateShortLink(input: { originUrl: "${originUrl}" }) { shortLink } }`;
+    const payloadStr = JSON.stringify({ query });
 
-    const factor = `${appId}${timestamp}${query}${secret}`;
+    const factor = `${appId}${timestamp}${payloadStr}${secret}`;
     const signature = crypto.createHash('sha256').update(factor).digest('hex');
 
     const response = await axios.post(
       'https://open-api.affiliate.shopee.com.br/graphql',
-      { query },
+      payloadStr,
       {
         headers: {
           'Content-Type': 'application/json',
