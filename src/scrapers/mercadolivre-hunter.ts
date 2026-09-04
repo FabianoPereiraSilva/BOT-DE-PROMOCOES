@@ -176,6 +176,8 @@ export class MercadoLivreHunter {
 
       if (categoryKey === 'geral' || !preset) {
         targetUrls.push('https://www.mercadolivre.com.br/ofertas?promotion_type=deal_of_the_day');
+        targetUrls.push(`https://lista.mercadolivre.com.br/mais-vendidos_Desconto_${Math.min(minDiscount, 20)}-100`);
+        targetUrls.push(`https://lista.mercadolivre.com.br/promocao_Desconto_${Math.min(minDiscount, 25)}-100`);
         targetUrls.push('https://www.mercadolivre.com.br/ofertas?promotion_type=lightning');
         targetUrls.push('https://www.mercadolivre.com.br/ofertas');
       } else {
@@ -186,6 +188,10 @@ export class MercadoLivreHunter {
           targetUrls.push(`https://lista.mercadolivre.com.br/${kwSlug}_Desconto_${Math.min(minDiscount, 15)}-100`);
           targetUrls.push(`https://lista.mercadolivre.com.br/${kwSlug}`);
         }
+
+        // Varredura por departamento raiz do nicho no site todo com desconto
+        const deptSlug = preset.key.replace(/_/g, '-');
+        targetUrls.push(`https://lista.mercadolivre.com.br/${deptSlug}_Desconto_${Math.min(minDiscount, 15)}-100`);
 
         if (preset.mlCategoryId) {
           targetUrls.push(`https://www.mercadolivre.com.br/ofertas?category=${preset.mlCategoryId}`);
@@ -217,8 +223,8 @@ export class MercadoLivreHunter {
             if (!link || !link.startsWith('http')) return;
             link = link.split('?')[0].split('#')[0];
 
-            // Título
-            const title = card.find('.poly-component__title, .promotion-item__title, .ui-search-item__title, h2').text().trim();
+            // Título (suporta cards de ofertas e cards de busca geral do site)
+            const title = card.find('.poly-component__title, .promotion-item__title, .ui-search-item__title, h2, a.ui-search-link').first().text().trim();
             if (!title || title.length < 5) return;
 
             // Imagem
