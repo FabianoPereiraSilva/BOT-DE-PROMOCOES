@@ -125,6 +125,10 @@ export class AmazonHunter {
       for (const sel of origSelectors) {
         const el = $(sel).first();
         if (el.length > 0) {
+          const parentText = el.closest('.basisPrice, .a-text-price, .a-price').text();
+          if (/\/(?:kg|g|l|ml|un|unidade|litro|quilo)/i.test(parentText)) {
+            continue;
+          }
           const raw = el.text().trim();
           const parsed = this.parsePrice(raw);
           if (parsed && parsed > currentPrice) {
@@ -144,6 +148,12 @@ export class AmazonHunter {
 
       if (!discountPercent && originalPrice && currentPrice && originalPrice > currentPrice) {
         discountPercent = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+      }
+
+      // Sanity check: Se o desconto passar de 80%, muito provavelmente é erro de captura de peso/unidade da Amazon
+      if (discountPercent && discountPercent > 80) {
+        discountPercent = undefined;
+        originalPrice = undefined;
       }
 
       // 6. Frete Grátis / Prime
@@ -195,10 +205,17 @@ export class AmazonHunter {
   }
 
   /**
-   * Converte string de preço (ex: "R$ 1.299,90" ou "129,99") para número float
+   * Converte string de preço (ex: "R$ 1.299,90" ou "129,99") para número float.
+   * Rejeita valores unitários que possuem /kg, /g, /l, /ml, /un etc.
    */
   private static parsePrice(priceStr: string): number | null {
     if (!priceStr) return null;
+
+    // Se contiver indicador de peso/volume unitário, descarta imediatamente
+    if (/\/(?:kg|g|l|ml|un|unidade|litro|quilo|metro)/i.test(priceStr)) {
+      return null;
+    }
+
     const clean = priceStr
       .replace(/R\$\s*/gi, '')
       .replace(/\s+/g, '')
@@ -276,20 +293,38 @@ export class AmazonHunter {
             if (!currentPrice || currentPrice < minPrice) return;
 
             // Preço Original Riscado
-            const origPriceStr = item.find('.a-text-price .a-offscreen, .a-price.a-text-price .a-offscreen').first().text().trim();
-            const originalPrice = this.parsePrice(origPriceStr) || undefined;
+            let originalPrice: number | undefined;
+            const origEl = item.find('.a-text-price:not([data-a-size="mini"]):not(:has(.a-size-mini)) .a-offscreen, .a-price.a-text-price .a-offscreen').first();
+            
+            // Verifica se o texto pai do elemento original não contém unidade de medida
+            const origParentText = origEl.closest('.a-text-price, .a-price').text();
+            if (!/\/(?:kg|g|l|ml|un|unidade|litro|quilo)/i.test(origParentText)) {
+              const origPriceStr = origEl.text().trim();
+              const parsedOrig = this.parsePrice(origPriceStr);
+              if (parsedOrig && parsedOrig > currentPrice) {
+                originalPrice = parsedOrig;
+              }
+            }
 
             let discountPercent: number | undefined;
             if (originalPrice && originalPrice > currentPrice) {
-              discountPercent = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+              const calcDiscount = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
+              // Sanity check: Se o desconto for absurdo (> 80%), muito provavelmente é bug de extração de peso/unidade da Amazon
+              if (calcDiscount <= 80) {
+                discountPercent = calcDiscount;
+              } else {
+                // Descarta o preço original falso
+                originalPrice = undefined;
+              }
             }
 
-            // Link
-            let link = item.find('h2 a.a-link-normal').attr('href') || item.find('a.a-link-normal').first().attr('href') || '';
-            if (!link) {
-              link = `https://www.amazon.com.br/dp/${asin}`;
-            } else if (!link.startsWith('http')) {
-              link = `https://www.amazon.com.br${link}`;
+            // Link Limpo com ASIN
+            let link = `https://www.amazon.com.br/dp/${asin}`;
+            const rawHref = item.find('h2 a.a-link-normal').attr('href') || item.find('a.a-link-normal').first().attr('href') || '';
+            if (rawHref && rawHref.includes('/sspa/click')) {
+              link = rawHref.startsWith('http') ? rawHref : `https://www.amazon.com.br${rawHref}`;
+            } else if (rawHref) {
+              link = rawHref.startsWith('http') ? rawHref : `https://www.amazon.com.br${rawHref}`;
             }
 
             const hasPrime = item.find('i.a-icon-prime, span:contains("Prime"), span:contains("GRÁTIS")').length > 0;

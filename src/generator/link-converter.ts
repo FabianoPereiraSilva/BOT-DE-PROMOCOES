@@ -103,14 +103,23 @@ export class LinkConverter {
     const tag = (settings.amazonAffiliateTag || 'fabianopere0d-20').trim();
 
     try {
-      // Extrair ASIN (10 caracteres alfanuméricos padrão Amazon)
-      const asinMatch = originalUrl.match(/(?:\/dp\/|\/gp\/product\/|\/product\/|\/d\/)([A-Z0-9]{10})/i);
+      let candidateUrl = originalUrl;
+
+      // 1. Se for link de redirecionamento ou anúncio patrocinado (/sspa/click), decodifica para achar o destino
+      if (candidateUrl.includes('/sspa/click') || candidateUrl.includes('%2Fdp%2F')) {
+        try {
+          candidateUrl = decodeURIComponent(candidateUrl);
+        } catch {}
+      }
+
+      // 2. Extrair ASIN (10 caracteres alfanuméricos padrão Amazon: B0... ou dígitos)
+      const asinMatch = candidateUrl.match(/(?:\/dp\/|\/gp\/product\/|\/product\/|\/d\/|ASIN=|asin%3D|asin=)([A-Z0-9]{10})/i);
       if (asinMatch && asinMatch[1]) {
         const asin = asinMatch[1].toUpperCase();
         return `https://www.amazon.com.br/dp/${asin}?tag=${tag}`;
       }
 
-      // Se for uma URL completa da Amazon sem ASIN simples no caminho, injeta ou substitui tag
+      // 3. Fallback: Se for uma URL da Amazon sem ASIN identificado, limpa parâmetros sujos e injeta a tag
       const urlObj = new URL(originalUrl);
       urlObj.searchParams.delete('tag');
       urlObj.searchParams.delete('ascsubtag');

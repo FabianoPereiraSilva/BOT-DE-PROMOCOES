@@ -139,7 +139,8 @@ export class CopyFormatter {
     // Chamada para Ação e Link
     lines.push('');
     lines.push(`🛒 <b>Garanta a sua antes que acabe:</b>`);
-    lines.push(`👉 <a href="${buyUrl}">${buyUrl}</a>`);
+    const displayUrlText = buyUrl.length > 80 ? `Ver Oferta na ${storeName} 🔗` : buyUrl;
+    lines.push(`👉 <a href="${buyUrl}">${displayUrlText}</a>`);
     lines.push('');
     lines.push(`<i>⚠️ Preço e disponibilidade sujeitos a alteração rápida!</i>`);
     lines.push('');

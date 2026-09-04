@@ -155,7 +155,8 @@ Instruções:
     // 6. Chamada para Ação com Link de Afiliado
     lines.push('');
     lines.push(`🛒 <b>Compre com Desconto Seguro:</b>`);
-    lines.push(`👉 <a href="${buyUrl}">${buyUrl}</a>`);
+    const displayUrlText = buyUrl.length > 80 ? `Ver Oferta na ${storeName} 🔗` : buyUrl;
+    lines.push(`👉 <a href="${buyUrl}">${displayUrlText}</a>`);
     lines.push('');
     lines.push(`<i>⚡ O preço e o estoque podem mudar a qualquer momento!</i>`);
     lines.push('');
