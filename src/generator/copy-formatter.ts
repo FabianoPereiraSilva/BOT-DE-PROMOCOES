@@ -63,21 +63,58 @@ export class CopyFormatter {
         .replace(/{cupom}/gi, deal.couponCode ? `🎟️ Cupom: <b>${deal.couponCode}</b>` : '');
     }
 
-    // Template padrão limpo e com alta conversão
-    const lines: string[] = [];
+    // Estilos visuais dinâmicos para diversificar as publicações do canal
+    const styles = [
+      // Estilo 1: Alerta Relâmpago / Urgência
+      () => {
+        const lines: string[] = [];
+        lines.push(`⚡ <b>ALERTA DE PROMOÇÃO RELÂMPAGO!</b> ⚡`);
+        lines.push('');
+        lines.push(`📦 <b>${this.escapeHtml(deal.title)}</b>`);
+        lines.push('');
+        if (formattedOriginalPrice) {
+          lines.push(`❌ De: <s>${formattedOriginalPrice}</s>`);
+          lines.push(`🔥 <b>Por apenas: ${formattedCurrentPrice}</b>${deal.discountPercent ? ` (${deal.discountPercent}% OFF)` : ''}`);
+        } else if (deal.discountPercent) {
+          lines.push(`🔥 <b>Por: ${formattedCurrentPrice}</b> (${deal.discountPercent}% OFF)`);
+        } else {
+          lines.push(`🔥 <b>Por apenas: ${formattedCurrentPrice}</b>`);
+        }
+        return lines;
+      },
+      // Estilo 2: Super Oferta / Desconto Quente
+      () => {
+        const lines: string[] = [];
+        lines.push(`${storeEmoji} <b>OFERTA IMPERDÍVEL NA ${storeName}!</b>`);
+        lines.push('');
+        lines.push(`🔹 <b>${this.escapeHtml(deal.title)}</b>`);
+        lines.push('');
+        if (formattedOriginalPrice) {
+          lines.push(`📉 Economize agora: de <s>${formattedOriginalPrice}</s>`);
+          lines.push(`💰 <b>Por: ${formattedCurrentPrice}</b>${deal.discountPercent ? ` (Economia de ${deal.discountPercent}%)` : ''}`);
+        } else {
+          lines.push(`💰 <b>Preço especial: ${formattedCurrentPrice}</b>`);
+        }
+        return lines;
+      },
+      // Estilo 3: Direto ao Ponto / Destaque de Preço
+      () => {
+        const lines: string[] = [];
+        lines.push(`🎯 <b>ACHADO DO DIA!</b>`);
+        lines.push('');
+        lines.push(`<b>${this.escapeHtml(deal.title)}</b>`);
+        lines.push('');
+        lines.push(`🏷️ <b>Valor: ${formattedCurrentPrice}</b>${deal.discountPercent ? ` <i>(-${deal.discountPercent}% de desconto)</i>` : ''}`);
+        if (formattedOriginalPrice) {
+          lines.push(`<i>Preço anterior: <s>${formattedOriginalPrice}</s></i>`);
+        }
+        return lines;
+      }
+    ];
 
-    // Título do Produto
-    lines.push(`📦 <b>${this.escapeHtml(deal.title)}</b>`);
-
-    // Bloco de Preço
-    if (formattedOriginalPrice) {
-      lines.push(`❌ De: <s>${formattedOriginalPrice}</s>`);
-      lines.push(`🔥 <b>Por: ${formattedCurrentPrice}</b>${deal.discountPercent ? ` (${deal.discountPercent}% de desconto!)` : ''}`);
-    } else if (deal.discountPercent) {
-      lines.push(`🔥 <b>Por: ${formattedCurrentPrice}</b> (${deal.discountPercent}% de desconto!)`);
-    } else {
-      lines.push(`🔥 <b>Por apenas: ${formattedCurrentPrice}</b>`);
-    }
+    // Escolhe aleatoriamente um dos estilos para o post
+    const selectedStyleIndex = Math.floor(Math.random() * styles.length);
+    const lines = styles[selectedStyleIndex]();
 
     // Destaques / Vantagens
     const highlights: string[] = [];
@@ -99,12 +136,12 @@ export class CopyFormatter {
       lines.push(...highlights);
     }
 
-    // Chamada para Ação
+    // Chamada para Ação e Link
     lines.push('');
-    lines.push(`🛒 <b>Compre com Desconto Seguro:</b>`);
+    lines.push(`🛒 <b>Garanta a sua antes que acabe:</b>`);
     lines.push(`👉 <a href="${buyUrl}">${buyUrl}</a>`);
     lines.push('');
-    lines.push(`<i>⚡ O preço e o estoque podem mudar a qualquer momento!</i>`);
+    lines.push(`<i>⚠️ Preço e disponibilidade sujeitos a alteração rápida!</i>`);
     lines.push('');
     const storeTag = deal.store === 'shopee' ? 'Shopee' : deal.store === 'amazon' ? 'Amazon' : 'MercadoLivre';
     lines.push(`#${storeTag} #Promoção #Desconto #Ofertas`);

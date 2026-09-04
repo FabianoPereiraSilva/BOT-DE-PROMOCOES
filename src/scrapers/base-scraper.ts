@@ -35,28 +35,54 @@ function getBrowserHeaders(ua: string): Record<string, string> {
   };
 }
 
-export async function fetchHtml(url: string, customHeaders: Record<string, string> = {}): Promise<string> {
-  try {
-    const ua = getRandomUserAgent();
-    const headers = {
-      ...getBrowserHeaders(ua),
-      ...customHeaders
-    };
-
-    const response = await axios.get(url, {
-      headers,
-      timeout: 15000,
-      maxRedirects: 5
-    });
-    return typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-  } catch (error: any) {
-    console.warn(`Erro ao baixar HTML de ${url}:`, error.message);
-    return '';
+/**
+ * Executa uma operação assíncrona com tentativas automáticas em caso de falha transitória
+ */
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 2, delayMs = 1200): Promise<T> {
+  let attempt = 0;
+  while (true) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      attempt++;
+      if (attempt > maxRetries) {
+        throw err;
+      }
+      // Pequeno backoff com jitter para desobstruir conexões simultâneas
+      const waitTime = delayMs * attempt + Math.floor(Math.random() * 500);
+      await new Promise(res => setTimeout(res, waitTime));
+    }
   }
 }
 
+export async function fetchHtml(url: string, customHeaders: Record<string, string> = {}): Promise<string> {
+  return withRetry(async () => {
+    try {
+      const ua = getRandomUserAgent();
+      const headers = {
+        ...getBrowserHeaders(ua),
+        ...customHeaders
+      };
+
+      const response = await axios.get(url, {
+        headers,
+        timeout: 15000,
+        maxRedirects: 5
+      });
+      return typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+    } catch (error: any) {
+      // Se for 404 ou 403, não faz sentido dar retry agressivo
+      if (error.response?.status === 404) return '';
+      throw error;
+    }
+  }).catch((error: any) => {
+    console.warn(`Erro ao baixar HTML de ${url} após retries:`, error.message);
+    return '';
+  });
+}
+
 export async function fetchJson<T = any>(url: string, customHeaders: Record<string, string> = {}): Promise<T> {
-  try {
+  return withRetry(async () => {
     const ua = getRandomUserAgent();
     const config: AxiosRequestConfig = {
       headers: {
@@ -76,17 +102,17 @@ export async function fetchJson<T = any>(url: string, customHeaders: Record<stri
 
     const response = await axios.get<T>(url, config);
     return response.data;
-  } catch (error: any) {
-    console.warn(`Erro ao baixar JSON de ${url}:`, error.message);
+  }).catch((error: any) => {
+    console.warn(`Erro ao baixar JSON de ${url} após retries:`, error.message);
     return {} as T;
-  }
+  });
 }
 
 /**
- * Fetch dedicado para API de busca da Shopee com headers anti-bot completos
+ * Fetch dedicado para API de busca da Shopee com headers anti-bot completos e retry
  */
 export async function fetchShopeeApi<T = any>(url: string): Promise<T> {
-  try {
+  return withRetry(async () => {
     const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
     const config: AxiosRequestConfig = {
       headers: {
@@ -113,10 +139,10 @@ export async function fetchShopeeApi<T = any>(url: string): Promise<T> {
 
     const response = await axios.get<T>(url, config);
     return response.data;
-  } catch (error: any) {
-    console.warn(`Erro ao acessar Shopee API (${url.substring(0, 80)}...):`, error.message);
+  }).catch((error: any) => {
+    console.warn(`Erro ao acessar Shopee API (${url.substring(0, 80)}...) após retries:`, error.message);
     return {} as T;
-  }
+  });
 }
 
 export function cleanPrice(priceStr: string | number | undefined | null): number {

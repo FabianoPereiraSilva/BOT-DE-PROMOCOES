@@ -22,8 +22,16 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchHistory();
   fetchAnalytics();
 
-  // Intervalo de atualização de status (15s)
+  // Intervalo de atualização de status em tempo real (15s)
   setInterval(fetchStatus, 15000);
+
+  // Polling automático da aba de logs se estiver visível (a cada 10s)
+  setInterval(() => {
+    const logsTab = document.getElementById('tab-logs');
+    if (logsTab && logsTab.classList.contains('active')) {
+      fetchLogs();
+    }
+  }, 10000);
 });
 
 // ==========================================

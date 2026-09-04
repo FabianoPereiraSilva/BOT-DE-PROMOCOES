@@ -157,6 +157,7 @@ export const dbService = {
   /**
    * Retorna um Set com hashes recentes (ID + URL limpa + título normalizado)
    * usado para filtrar duplicatas de forma eficiente no ciclo do autopilot.
+   * Utiliza até 10 palavras do título para evitar falsos positivos com produtos de marcas parecidas.
    */
   async getRecentPostedHashes(hoursThreshold = 72): Promise<Set<string>> {
     const result = await pool.query(
@@ -172,17 +173,41 @@ export const dbService = {
         if (cleanUrl.length > 10) hashes.add(`url:${cleanUrl}`);
       }
       if (row.title) {
+        // Usa até 10 palavras significativas em vez de 5, reduzindo falsos descartes
         const normTitle = row.title
           .toLowerCase()
           .replace(/[^a-z0-9]/g, ' ')
           .split(/\s+/)
           .filter(Boolean)
-          .slice(0, 5)
+          .slice(0, 10)
           .join(' ');
-        if (normTitle.length > 5) hashes.add(`title:${normTitle}`);
+        if (normTitle.length > 8) hashes.add(`title:${normTitle}`);
       }
     }
     return hashes;
+  },
+
+  // ── MANUTENÇÃO & LIMPEZA AUTOMÁTICA ───────────────────────
+  /**
+   * Remove logs e cliques com mais de X dias para manter o PostgreSQL enxuto e rápido.
+   */
+  async cleanupOldData(daysThreshold = 30): Promise<{ logsRemoved: number; clicksRemoved: number }> {
+    try {
+      const logsResult = await pool.query(
+        `DELETE FROM logs WHERE timestamp < NOW() - INTERVAL '${daysThreshold} days'`
+      );
+      const clicksResult = await pool.query(
+        `DELETE FROM clicks WHERE created_at < NOW() - INTERVAL '${daysThreshold} days'`
+      );
+
+      return {
+        logsRemoved: logsResult.rowCount || 0,
+        clicksRemoved: clicksResult.rowCount || 0
+      };
+    } catch (err: any) {
+      console.warn('[CLEANUP] Erro ao limpar dados antigos:', err.message);
+      return { logsRemoved: 0, clicksRemoved: 0 };
+    }
   },
 
   // ── DEALS POSTADOS ────────────────────────────────────────

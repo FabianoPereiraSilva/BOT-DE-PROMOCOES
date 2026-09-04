@@ -183,48 +183,74 @@ export class AutopilotEngine {
           if (recentHashes.has(`id:${deal.id}`)) return false;
           const cleanUrl = (deal.originalUrl || '').split('?')[0].split('#')[0];
           if (cleanUrl.length > 10 && recentHashes.has(`url:${cleanUrl}`)) return false;
-          const normTitle = deal.title.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(Boolean).slice(0, 5).join(' ');
-          if (normTitle.length > 5 && recentHashes.has(`title:${normTitle}`)) return false;
+          const normTitle = deal.title
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, ' ')
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 10)
+            .join(' ');
+          if (normTitle.length > 8 && recentHashes.has(`title:${normTitle}`)) return false;
           return true;
         });
 
         if (freshDeals.length === 0) {
-          await dbService.addLog('info', `[${channel.name}] Todas as ofertas caçadas já foram postadas recentemente (Deduplicação rigorosa ativa).`);
+          await dbService.addLog('info', `[${channel.name}] Todas as ofertas caçadas já foram postadas recentemente (Deduplicação ativa).`);
           continue;
         }
 
-        // Seleciona a melhor oferta inédita para enviar a este canal
-        const dealToPost = freshDeals[0];
+        // Seleciona as melhores ofertas inéditas para enviar a este canal (até 2 por ciclo para maximizar conversão sem flood)
+        const maxDealsToSend = Math.min(2, freshDeals.length);
+        const dealsToPost = freshDeals.slice(0, maxDealsToSend);
 
-        const pubResult = await TelegramPublisher.publishDeal(
-          dealToPost,
-          undefined,
-          channel.chatId,
-          channel.customBotToken,
-          channel.id
-        );
+        for (let i = 0; i < dealsToPost.length; i++) {
+          const dealToPost = dealsToPost[i];
 
-        if (pubResult.success) {
-          await dbService.recordPostedDeal({
-            id: dealToPost.id,
-            channelId: channel.id,
-            category: channel.category,
-            store: dealToPost.store,
-            title: dealToPost.title,
-            originalPrice: dealToPost.originalPrice,
-            currentPrice: dealToPost.currentPrice,
-            discountPercent: dealToPost.discountPercent,
-            imageUrl: dealToPost.imageUrl,
-            originalUrl: dealToPost.originalUrl,
-            affiliateUrl: dealToPost.affiliateUrl,
-            telegramMessageId: pubResult.messageId
-          });
-          totalDealsPosted++;
+          const pubResult = await TelegramPublisher.publishDeal(
+            dealToPost,
+            undefined,
+            channel.chatId,
+            channel.customBotToken,
+            channel.id
+          );
+
+          if (pubResult.success) {
+            await dbService.recordPostedDeal({
+              id: dealToPost.id,
+              channelId: channel.id,
+              category: channel.category,
+              store: dealToPost.store,
+              title: dealToPost.title,
+              originalPrice: dealToPost.originalPrice,
+              currentPrice: dealToPost.currentPrice,
+              discountPercent: dealToPost.discountPercent,
+              imageUrl: dealToPost.imageUrl,
+              originalUrl: dealToPost.originalUrl,
+              affiliateUrl: dealToPost.affiliateUrl,
+              telegramMessageId: pubResult.messageId
+            });
+
+            // Atualiza hashes em memória no loop atual
+            recentHashes.add(`id:${dealToPost.id}`);
+            const postedUrl = (dealToPost.originalUrl || '').split('?')[0].split('#')[0];
+            if (postedUrl) recentHashes.add(`url:${postedUrl}`);
+
+            totalDealsPosted++;
+            await dbService.addLog('success', `[${channel.name}] Oferta ${i + 1}/${maxDealsToSend} postada: "${dealToPost.title.substring(0, 50)}..." (${dealToPost.discountPercent || 0}% OFF)`);
+          }
+
+          // Se houver mais de uma oferta para o mesmo canal, aguarda 10 segundos entre as postagens (anti-spam)
+          if (i < dealsToPost.length - 1) {
+            await new Promise(res => setTimeout(res, 10000));
+          }
         }
 
-        // Intervalo de segurança entre envios para canais diferentes
+        // Intervalo de segurança entre canais diferentes
         await new Promise(res => setTimeout(res, 3000));
       }
+
+      // Executa manutenção automática preventiva (limpeza de logs/cliques > 30 dias)
+      dbService.cleanupOldData(30).catch(() => {});
 
       const summaryMsg = `Ciclo finalizado: ${totalDealsFound} ofertas analisadas em ${channelsToProcess.length} canais, ${totalDealsPosted} postadas com sucesso.`;
       await dbService.addLog('success', summaryMsg);
